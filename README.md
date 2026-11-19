@@ -3,72 +3,96 @@
 [![CI](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/ci.yml/badge.svg)](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/ci.yml)
 [![Build source](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/build-source.yml/badge.svg)](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/build-source.yml)
 
-Ubuntu source-package build and Launchpad PPA automation for **FFmpeg 9**, maintained by AlexanderWagnerDev.
+Ubuntu/Launchpad PPA source packaging for **FFmpeg 9**, maintained by AlexanderWagnerDev.
 
-- GitHub repository: https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu
-- Launchpad **project**: https://launchpad.net/awdev-ffmpeg
-- Planned Launchpad **PPA**: https://launchpad.net/~alexanderwagnerdev/+archive/ubuntu/ffmpeg
-- Upstream FFmpeg: https://ffmpeg.org/
-- Debian FFmpeg source packaging: https://tracker.debian.org/pkg/ffmpeg
+**Status:** FFmpeg 9.0.2 source-package generation and verification work on GitHub CI. **No Launchpad binary PPA publication has been verified yet.** This repository does not itself host downloadable \`.deb\` files. Refer to the [Actions runs](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions) for live status.
 
-> **Status: packaging infrastructure / not a published FFmpeg 9 PPA yet.**
-> Creating a Launchpad project does not create a PPA. No binaries are published by this repository until the separate PPA is created, credentials configured, and builds succeed.
+| Link | Purpose |
+|---|---|
+| [Launchpad project](https://launchpad.net/awdev-ffmpeg) | Project identity and information |
+| [Planned public PPA](https://launchpad.net/~alexanderwagnerdev/+archive/ubuntu/ffmpeg) | Actual APT package publishing, once created and populated |
+| [FFmpeg upstream](https://ffmpeg.org/) | Original multimedia software |
+| [Debian FFmpeg source](https://tracker.debian.org/pkg/ffmpeg) | Source package definitions used by the build |
 
-## How it works
+## Architecture
 
-The build retrieves a verified **Debian testing source package** for FFmpeg, checks that its upstream version is **9.x**, adds a series-specific Ubuntu version/changelog entry and produces an **unsigned** `.dsc` source upload. GitHub Actions can store it for inspection. A **separate, manually triggered protected workflow** signs and uploads it to Launchpad via SFTP. Launchpad, not GitHub, builds amd64/arm64 `.deb` packages.
+1. Obtain the FFmpeg 9.x source package from the **signed Debian testing source repository** (only \`deb-src\`, not binary sources).
+2. Keep Debian's packaging and patches. Add a unique Ubuntu-series-specific changelog version.
+3. Produce a Debian/Ubuntu **source upload**, validate it by extracting the newly generated \`.dsc\`, and store it as a GitHub Actions artifact.
+4. In a separate, protected workflow, check Launchpad for earlier uploads, sign the source package with a registered OpenPGP identity and submit it over SFTP.
+5. **Launchpad**, not GitHub, builds and hosts the final apt-installable amd64/arm64 packages.
 
-The Debian packaging is intentionally **not copied** into this repository: the Debian Multimedia Maintainers provide `debian/control`, `debian/rules`, patches and binary package definitions as part of the Debian source package. This reduces the chance of silently breaking ABI/package relations by inventing incomplete packaging.
+The two-job publication workflow keeps signing/SSH secrets away from the
+build process that executes upstream/Debian source scripts.
 
-### Target series
+## Ubuntu support
 
-| Ubuntu | Series | Status |
+| Ubuntu | Architecture target | Status |
 |---|---|---|
-| 26.04 LTS | resolute | Primary target; launchpad binary-build validation still required |
-| 24.04 LTS | noble | Experimental; dependencies/patches may be needed |
-| 22.04 LTS | jammy | Experimental; dependencies/patches may be needed |
+| **26.04 LTS (resolute)** | amd64, arm64 | Primary; source package validated; Launchpad binaries pending |
+| 24.04 LTS (noble) | amd64, arm64 | Experimental; dependency backports may be needed |
+| 22.04 LTS (jammy) | amd64, arm64 | Experimental; dependency backports may be needed |
 
-Architecture support depends on the PPA's enabled processors and the source's build dependencies.
+The Launchpad PPA must have \`arm64\` enabled explicitly. Do not assume a source package validated on GitHub can be built against every Ubuntu release or architecture.
 
-## Development and checks
+## Local checks
 
-```bash
+\`\`\`bash
 python3 -m unittest discover -s tests -v
 bash -n scripts/*.sh
 shellcheck scripts/*.sh
-```
+\`\`\`
 
-On an Ubuntu build host (requires sudo; **source-only Debian metadata** is added):
+Generate a source upload (on Ubuntu; adds a **source-only** Debian APT entry):
 
-```bash
+\`\`\`bash
 sudo bash scripts/setup-build-env.sh
 bash scripts/build-source.sh resolute 1
 bash scripts/verify-source.sh resolute
-```
+\`\`\`
 
-Build files are written to `dist/resolute/`; no binary package is built locally. To repeat a local build, remove `work/resolute` and `dist/resolute` first.
+Artifacts are written to \`dist/resolute/\`. Remove \`work/resolute/\` and
+\`dist/resolute/\` before repeating the local build to avoid stale files.
 
-## GitHub Actions
+## CI and maintenance
 
-- **CI:** shell syntax, ShellCheck, Python unit tests.
-- **Build Ubuntu source package:** manual for any target or a weekly unsigned source build for `resolute`. Uploads artifacts for review; **never publishes automatically**.
-- **Publish to Launchpad PPA:** manually invoked; runs under the `launchpad-ppa` GitHub Environment, imports separately configured secrets, signs and uploads a source package.
+| Workflow | Operation |
+|---|---|
+| [CI](.github/workflows/ci.yml) | Python unit tests, ShellCheck, bash syntax |
+| [Build Ubuntu source package](.github/workflows/build-source.yml) | Builds and validates unsigned source packages on push/manual runs and weekly; stores artifacts |
+| [Publish to Launchpad PPA](.github/workflows/publish-ppa.yml) | Environment-protected SFTP source upload; manual or **opt-in** scheduled publishing |
+| [Dependabot](.github/dependabot.yml) | GitHub Actions dependency maintenance |
 
-See [Launchpad setup and publication](docs/LAUNCHPAD.md) before the first PPA upload.
+All external GitHub Actions are pinned to commit hashes.
 
-## APT installation (after successful PPA publication)
+**Publication is disabled by default** until the [Launchpad setup](docs/LAUNCHPAD.md) is complete. The \`PPA_AUTO_PUBLISH\` repository variable can enable optional weekly release checks after first successful manual publication and Ubuntu installation checks.
 
-```bash
+## Installation (only after the PPA builds successfully)
+
+\`\`\`bash
 sudo add-apt-repository ppa:alexanderwagnerdev/ffmpeg
 sudo apt update
 apt-cache policy ffmpeg
 sudo apt -s install ffmpeg
-```
+\`\`\`
 
-**Do not assume an FFmpeg 9 package exists in this PPA yet.** Launchpad builds may fail because Debian 9.x build dependencies are newer than those provided by a particular Ubuntu series. The generated source artifact is only the starting point for testing and backport fixes.
+After inspecting the dry run:
 
-## Maintenance and licensing
+\`\`\`bash
+sudo apt install ffmpeg
+ffmpeg -version
+\`\`\`
 
-The automation is maintained here. FFmpeg itself and the Debian source package retain their respective upstream copyrights and license requirements. Inspect package licensing and build configuration before distributing codec-enabled binaries. See [LICENSE](LICENSE) for this repository's own license; that license does **not** replace upstream FFmpeg licensing.
+When Ubuntu Pro/ESM or another package source takes precedence, compare the
+versions and APT priority with \`apt-cache policy ffmpeg\`. Avoid global pinning
+or disabling security updates.
 
-Contributions and pull requests are welcome.
+## Licensing
+
+Automation and supporting repository materials follow [LICENSE](LICENSE).
+FFmpeg and Debian packaging have their **own licenses and copyright notices**;
+the license in this repository does not supersede them. Rebuilding and
+redistributing multimedia codecs can have additional legal/technical
+requirements depending on build configuration and jurisdiction.
+
+Issues and PRs are welcome.

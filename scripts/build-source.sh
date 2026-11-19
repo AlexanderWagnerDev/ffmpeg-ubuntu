@@ -44,6 +44,18 @@ fi
 SOURCE_DIR="${source_dirs[0]}"
 DEBIAN_VERSION="$(dpkg-parsechangelog --file "$SOURCE_DIR/debian/changelog" --show-field Version)"
 NEW_VERSION="$(python3 "$ROOT/scripts/package_version.py" "$DEBIAN_VERSION" "$SERIES" "$REVISION")"
+# Debian testing currently requires debhelper 14, which is not in the
+# Ubuntu 26.04 archive. Downgrade the packaging compatibility level only for
+# resolute; keep this scoped and verify the full binary build on Launchpad.
+if [[ "$SERIES" == "resolute" ]]; then
+  if grep -Fq 'debhelper-compat (= 14)' "$SOURCE_DIR/debian/control"; then
+    sed -i 's/debhelper-compat (= 14)/debhelper-compat (= 13)/g' "$SOURCE_DIR/debian/control"
+    echo "Using Ubuntu-compatible debhelper level 13"
+  else
+    echo "Debian debhelper requirement changed; recheck Ubuntu compatibility" >&2
+    exit 1
+  fi
+fi
 export DEBFULLNAME="Alexander Wagner"
 export DEBEMAIL="info@alexanderwagnerdev.com"
 cd "$SOURCE_DIR"

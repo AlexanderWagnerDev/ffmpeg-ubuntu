@@ -34,7 +34,7 @@ fi
 cd "$WORK"
 # This uses ONLY the Debian *source* index configured by setup-build-env.sh.
 # It does NOT add any Debian binary repositories to Ubuntu.
-apt-get source -t testing ffmpeg
+apt-get source ffmpeg
 
 mapfile -t source_dirs < <(find "$WORK" -maxdepth 1 -mindepth 1 -type d -name 'ffmpeg-*' | sort)
 if [[ "${#source_dirs[@]}" -ne 1 ]]; then

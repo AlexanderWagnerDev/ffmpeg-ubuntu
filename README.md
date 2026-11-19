@@ -29,9 +29,11 @@ build process that executes upstream/Debian source scripts.
 
 | Ubuntu | Architecture target | Status |
 |---|---|---|
-| **26.04 LTS (resolute)** | amd64, arm64 | Primary; source package validated; Launchpad binaries pending |
+| **26.04 LTS (resolute)** | amd64, arm64 | Source package and amd64 build-dependency resolution validated; Launchpad binaries pending |
 | 24.04 LTS (noble) | amd64, arm64 | Experimental; dependency backports may be needed |
 | 22.04 LTS (jammy) | amd64, arm64 | Experimental; dependency backports may be needed |
+
+Debian's `debhelper-compat (= 14)` requirement is adapted to level 13 for Resolute, where level 14 is unavailable. A full Launchpad binary build is still necessary to validate this backport.
 
 The Launchpad PPA must have `arm64` enabled explicitly. Do not assume a source package validated on GitHub can be built against every Ubuntu release or architecture.
 

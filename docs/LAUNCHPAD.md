@@ -43,6 +43,7 @@ https://launchpad.net/~alexanderwagnerdev/+archive/ubuntu/ffmpeg
 - `awdev-ffmpeg-ppa` is an explicit `dput` SFTP profile created by the
   workflow (username `alexanderwagnerdev`, incoming directory
   `~alexanderwagnerdev/ubuntu/ffmpeg/`).
+- CI now also checks whether the target Ubuntu archive can resolve declared source build dependencies using an isolated Ubuntu Docker container. This is **not** a complete binary-build or ABI test. A failed dependency check blocks publication until compatibility is addressed.
 - Launchpad accepts source uploads only. It builds and publishes the final
   `.deb` files; an accepted upload is **not** proof that a binary build succeeds.
 - A public API check prevents attempting to reupload an identical or older

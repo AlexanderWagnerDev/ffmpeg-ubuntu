@@ -84,6 +84,10 @@ If Ubuntu ESM or another repository has a higher APT priority, inspect
 `apt-cache policy ffmpeg` and implement narrowly scoped pinning. Do **not**
 disable Ubuntu security updates globally.
 
+## Ubuntu 26.04 packaging adjustment
+
+Debian testing currently declares `debhelper-compat (= 14)` for FFmpeg 9. The Resolute source build changes that requirement to `debhelper-compat (= 13)` before generating a source upload. This resolved the Ubuntu 26.04 dependency-resolution check, but **does not prove a successful binary build**. Review Launchpad build logs after uploading.
+
 ## Provenance and limitations
 
 The source build uses the **signed Debian testing `deb-src` index** and

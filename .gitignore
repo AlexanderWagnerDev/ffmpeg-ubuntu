@@ -1,0 +1,16 @@
+.idea/
+.vscode/
+__pycache__/
+*.py[cod]
+work/
+dist/
+*.dsc
+*.changes
+*.buildinfo
+*.deb
+*.udeb
+*.tar.xz
+*.tar.gz
+*.upload
+*.asc
+!.github/**

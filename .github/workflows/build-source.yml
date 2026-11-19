@@ -1,0 +1,47 @@
+name: Build Ubuntu source package
+on:
+  workflow_dispatch:
+    inputs:
+      series:
+        description: Ubuntu series
+        required: true
+        default: resolute
+        type: choice
+        options:
+          - resolute
+          - noble
+          - jammy
+      revision:
+        description: Increment when rebuilding an already published Debian version
+        required: true
+        default: '1'
+        type: string
+  schedule:
+    - cron: '19 4 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      SERIES: ${{ inputs.series || 'resolute' }}
+      REVISION: ${{ inputs.revision || '1' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Configure signed Debian source-only repository
+        run: sudo bash scripts/setup-build-env.sh
+      - name: Build source package
+        run: bash scripts/build-source.sh "$SERIES" "$REVISION"
+      - name: Validate source package
+        run: bash scripts/verify-source.sh "$SERIES"
+      - name: Upload unsigned source archive for inspection
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ffmpeg-source-${{ env.SERIES }}
+          path: dist/${{ env.SERIES }}/
+          if-no-files-found: error
+          retention-days: 14

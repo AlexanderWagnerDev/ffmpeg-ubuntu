@@ -18,7 +18,7 @@ Ubuntu/Launchpad PPA source packaging for **FFmpeg 9**, maintained by AlexanderW
 
 1. Obtain the FFmpeg 9.x source package from the **signed Debian testing source repository** (only `deb-src`, not binary sources).
 2. Keep Debian's packaging and patches. Add a unique Ubuntu-series-specific changelog version.
-3. Produce a Debian/Ubuntu **source upload**, validate it by extracting the newly generated `.dsc`, and store it as a GitHub Actions artifact.
+3. Produce a Debian/Ubuntu **source upload**, validate it by extracting the newly generated `.dsc`, check whether the target Ubuntu release can resolve its declared build dependencies, and store it as a GitHub Actions artifact.
 4. In a separate, protected workflow, check Launchpad for earlier uploads, sign the source package with a registered OpenPGP identity and submit it over SFTP.
 5. **Launchpad**, not GitHub, builds and hosts the final apt-installable amd64/arm64 packages.
 

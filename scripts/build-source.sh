@@ -53,18 +53,29 @@ dch --newversion "$NEW_VERSION" --distribution "$SERIES" --force-distribution \
 # Actual dependency resolution/builds are the job of Launchpad.
 dpkg-buildpackage -S -sa -us -uc -d
 
+# Only stage files from the newly generated Ubuntu package. apt-get source
+# also leaves the ORIGINAL Debian .dsc in WORK; including it would make the
+# artifact ambiguous and cause source validation to fail.
 shopt -s nullglob
-artifacts=("$WORK"/ffmpeg_*.dsc "$WORK"/ffmpeg_*.tar.* "$WORK"/ffmpeg_*_source.changes)
-if [[ "${#artifacts[@]}" -lt 3 ]]; then
-  echo "Missing expected .dsc, source tarballs, or _source.changes" >&2
+VERSION_NO_EPOCH="${NEW_VERSION#*:}"
+DEBIAN_NO_EPOCH="${DEBIAN_VERSION#*:}"
+UPSTREAM_VERSION="${DEBIAN_NO_EPOCH%-*}"
+ubuntu_dsc="$WORK/ffmpeg_${VERSION_NO_EPOCH}.dsc"
+ubuntu_changes="$WORK/ffmpeg_${VERSION_NO_EPOCH}_source.changes"
+ubuntu_delta=("$WORK"/ffmpeg_"${VERSION_NO_EPOCH}".debian.tar.*)
+orig_archive=("$WORK"/ffmpeg_"${UPSTREAM_VERSION}".orig.tar.*)
+if [[ ! -f "$ubuntu_dsc" || ! -f "$ubuntu_changes" ||
+      "${#ubuntu_delta[@]}" -ne 1 || "${#orig_archive[@]}" -lt 1 ]]; then
+  echo "Missing expected Ubuntu source package artifacts" >&2
   exit 1
+fi
+artifacts=("$ubuntu_dsc" "$ubuntu_changes" "${ubuntu_delta[@]}" "${orig_archive[@]}")
+ubuntu_buildinfo="$WORK/ffmpeg_${VERSION_NO_EPOCH}_source.buildinfo"
+if [[ -f "$ubuntu_buildinfo" ]]; then
+  artifacts+=("$ubuntu_buildinfo")
 fi
 cp -- "${artifacts[@]}" "$OUT/"
-changes=("$OUT"/ffmpeg_*_source.changes)
-if [[ "${#changes[@]}" -ne 1 ]]; then
-  echo "Expected exactly one source .changes file" >&2
-  exit 1
-fi
+changes=("$OUT/$(basename "$ubuntu_changes")")
 echo "Source package: $NEW_VERSION ($SERIES)"
 echo "Unsigned artifacts: $OUT"
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then

@@ -1,5 +1,10 @@
 name: Build Ubuntu source package
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/build-source.yml'
   workflow_dispatch:
     inputs:
       series:

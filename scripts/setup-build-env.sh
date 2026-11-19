@@ -5,6 +5,7 @@ if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root: sudo bash scripts/setup-build-env.sh" >&2
   exit 2
 fi
+# shellcheck source=/dev/null
 . /etc/os-release
 if [[ "$ID" != ubuntu ]]; then
   echo "This setup is intended for Ubuntu build runners only" >&2

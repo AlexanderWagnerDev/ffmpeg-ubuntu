@@ -50,3 +50,5 @@ jobs:
           path: dist/${{ env.SERIES }}/
           if-no-files-found: error
           retention-days: 14
+      - name: Verify target Ubuntu build dependencies
+        run: bash scripts/check-build-deps.sh "$SERIES"

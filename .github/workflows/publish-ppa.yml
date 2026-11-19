@@ -66,6 +66,10 @@ jobs:
         run: bash scripts/verify-source.sh "$SERIES"
         env:
           SERIES: ${{ steps.config.outputs.series }}
+      - name: Verify target Ubuntu build dependencies
+        run: bash scripts/check-build-deps.sh "$SERIES"
+        env:
+          SERIES: ${{ steps.config.outputs.series }}
       - name: Upload unsigned source package (no secrets)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

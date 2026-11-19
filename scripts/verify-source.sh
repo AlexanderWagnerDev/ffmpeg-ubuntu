@@ -11,7 +11,9 @@ if [[ "${#dsc[@]}" -ne 1 || "${#changes[@]}" -ne 1 ]]; then
   echo "Expected exactly one .dsc and one source .changes file" >&2
   exit 1
 fi
-dpkg-source --info "${dsc[0]}" >/dev/null
+TEMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TEMP_DIR"' EXIT
+dpkg-source -x "${dsc[0]}" "$TEMP_DIR/source" >/dev/null
 test "$(sed -n 's/^Distribution: //p' "${changes[0]}")" = "$SERIES" || {
   echo "Unexpected distribution in source .changes" >&2
   exit 1

@@ -85,6 +85,18 @@ Manual runs accept a positive `revision` (default `1`) and a `force` toggle (def
 
 The source-package and binary validation workflows remain available for development CI, but have **no independent release schedule**. The signing secrets must be configured before publishing; Launchpad's subsequent builds are asynchronous and may still fail or require time to become available.
 
+### Package version format
+
+The Ubuntu rebuilds use short, codename-tagged Debian versions without the old `+ubuntuXX.XX~ppaN` suffix. For example, FFmpeg `7:9.0.2-6` with package revision `1` becomes:
+
+| Ubuntu release | Package version |
+|---|---|
+| 24.04 Noble | `7:9.0.2-6.1~noble` |
+| 26.04 Resolute | `7:9.0.2-6.1~resolute` |
+| 26.10 Stonking | `7:9.0.2-6.1~stonking` |
+
+Revision `2` gives `-6.2~resolute`, and so on. The package version includes Debian's epoch and packaging revision; it is intentionally not just the upstream FFmpeg version. Debian's version comparator confirms the new `-6.1~resolute` revision is higher than the previous `-6+ubuntu26.04~ppa1` package, preserving upgrades for existing installations. The central daily check triggers a one-time republish when only the old suffix exists for the latest upstream release; subsequent checks skip once a matching current-scheme version is published. Rebuilding a *previously published* package still requires a new revision.
+
 ### Release changelog
 
 Every Ubuntu source package now includes the **official FFmpeg release notes** for its exact upstream version in `debian/changelog`, in addition to the Ubuntu packaging/rebuild entry. The notes are read directly from the source tree's upstream `Changelog` (the official signed FFmpeg tarball when updated, or the signed Debian source when already current), not a separately scraped web summary. The PPA package's **Changelog** shows the release-specific features and fixes for each Ubuntu version, rather than just a generic rebuild line. If the exact release section cannot be found, the build fails rather than publishing misleading notes.

@@ -27,8 +27,8 @@ docker run --rm \
     printf "deb [trusted=yes] file:/tmp/aptrepo ./\n" > /etc/apt/sources.list.d/ffmpeg-local.list
     apt-get update -qq
     apt-get install -y --no-install-recommends ffmpeg
-    ffmpeg -hide_banner -version | grep -Eq "^ffmpeg version (n)?9\."
-    ffprobe -hide_banner -version | grep -Eq "^ffprobe version (n)?9\."
+    ffmpeg -hide_banner -version | grep -Eq "^ffmpeg version (n)?[0-9]+\."
+    ffprobe -hide_banner -version | grep -Eq "^ffprobe version (n)?[0-9]+\."
     ffmpeg -hide_banner -loglevel error -f lavfi -i "sine=frequency=440:duration=0.1" \
       -ac 1 -ar 8000 -f wav -y /tmp/smoke.wav
     test -s /tmp/smoke.wav

@@ -9,8 +9,8 @@ on:
         type: string
         default: '1'
   schedule:
-    # Disabled by default. Set PAGES_APT_AUTO_PUBLISH=true only after first success.
-    - cron: '23 5 * * 3'
+    # Daily upstream stable check; skip when already published.
+    - cron: '13 7 * * *'
 
 permissions:
   contents: read
@@ -20,10 +20,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check-upstream:
+    name: Check for a new stable FFmpeg release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      update: ${{ steps.compare.outputs.update }}
+      version: ${{ steps.compare.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Compare upstream and published Pages APT version
+        id: compare
+        if: github.event_name == 'schedule'
+        run: python3 scripts/needs_release.py --channel pages
+
   prepare-source:
+    needs: check-upstream
     if: >-
       github.ref == 'refs/heads/main' &&
-      (github.event_name == 'workflow_dispatch' || vars.PAGES_APT_AUTO_PUBLISH == 'true')
+      (github.event_name == 'workflow_dispatch' || needs.check-upstream.outputs.update == 'true')
     name: Prepare one consistent FFmpeg 9 source package
     runs-on: ubuntu-latest
     timeout-minutes: 45

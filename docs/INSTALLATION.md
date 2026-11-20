@@ -1,6 +1,6 @@
 # Installing FFmpeg for Ubuntu
 
-Packages are initially targeted at **Ubuntu 26.04 LTS (Resolute), AMD64 and ARM64**. Confirm that a successful binary build and repository publication exist for your system before installing. Ubuntu 22.04 and 24.04 are not currently supported.
+Packages target **Ubuntu 24.04 LTS (Noble), 26.04 LTS (Resolute), and 26.10 (Stonking)**, each on **AMD64 and ARM64**. Verify that binary packages are available for your system before installing.
 
 ## Option 1: Launchpad PPA
 
@@ -41,10 +41,16 @@ curl -fsSL https://alexanderwagnerdev.github.io/ffmpeg-ubuntu/ffmpeg-ubuntu.gpg 
 
 gpg --show-keys --with-fingerprint /etc/apt/keyrings/ffmpeg-ubuntu.gpg
 
-sudo tee /etc/apt/sources.list.d/ffmpeg-ubuntu.sources >/dev/null <<'SOURCES'
+source /etc/os-release
+case "$VERSION_CODENAME" in
+  noble|resolute|stonking) ;;
+  *) echo "Unsupported Ubuntu release: $VERSION_CODENAME" >&2; exit 1 ;;
+esac
+
+sudo tee /etc/apt/sources.list.d/ffmpeg-ubuntu.sources >/dev/null <<SOURCES
 Types: deb
 URIs: https://alexanderwagnerdev.github.io/ffmpeg-ubuntu/
-Suites: resolute
+Suites: ${VERSION_CODENAME}
 Components: main
 Architectures: amd64 arm64
 Signed-By: /etc/apt/keyrings/ffmpeg-ubuntu.gpg
@@ -63,7 +69,7 @@ ffmpeg -version
 ffprobe -version
 ```
 
-APT chooses the appropriate architecture automatically. Do **not** use the `resolute` source on Ubuntu 22.04 or 24.04.
+APT chooses your native architecture and the configured source uses your installed Ubuntu codename.
 
 ## Troubleshooting
 

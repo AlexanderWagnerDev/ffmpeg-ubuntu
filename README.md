@@ -42,6 +42,24 @@ See the [installation guide](docs/INSTALLATION.md) for the public keyring, APT s
 | **26.04 LTS (Resolute)** | Build target | Build target |
 | **26.10 (Stonking)** | Build target | Build target |
 
+### Launchpad PPA architecture coverage
+
+The **Launchpad PPA** builds binary packages from one signed source upload per Ubuntu release, using the processor architectures enabled in the PPA's Launchpad settings. The intended PPA architecture set is:
+
+| Architecture | Ubuntu 24.04 | Ubuntu 26.04 | Ubuntu 26.10 |
+|---|---|---|---|
+| `amd64` | Eligible | Eligible | Eligible |
+| `amd64v3` | Not supported | Eligible | Eligible |
+| `arm64` | Eligible | Eligible | Eligible |
+| `armhf` | Eligible | Eligible | Eligible |
+| `ppc64el` | Eligible | Eligible | Eligible |
+| `riscv64` | Eligible | Eligible | Eligible |
+| `s390x` | Eligible | Eligible | Eligible |
+
+**Eligible does not mean enabled, built, or published.** Visit the [FFmpeg PPA](https://launchpad.net/~alexanderwagnerdev/+archive/ubuntu/ffmpeg), select **Change details → Processors**, and enable each available architecture. Some architectures or variants may require Launchpad permission. Verify the resulting package build status separately for each Ubuntu release and architecture; the automated source upload does not wait for Launchpad builds to finish. Already uploaded source package versions may require a new upload with a higher package revision (or an appropriate Launchpad rebuild mechanism) to trigger newly enabled architectures.
+
+The **GitHub Pages APT repository** remains independently built and smoke-tested for only `amd64` and `arm64` on all three Ubuntu releases. Unlike Launchpad, GitHub-hosted Linux runners do not provide native builders for all of the other targets, so additional architecture builds require separate build infrastructure and tests. Do not advertise additional architectures as available on GitHub Pages until they have actually been published.
+
 A **build target is not a guarantee that installable packages have been published**. Check the [workflow results](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions) and [PPA package status](https://launchpad.net/~alexanderwagnerdev/+archive/ubuntu/ffmpeg).
 
 ## Packages and features

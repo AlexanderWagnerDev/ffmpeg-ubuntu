@@ -6,8 +6,9 @@ from pathlib import Path
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from patch_ubuntu_control import (add_runtime_dependencies, FFMPEG_RUNTIME,
-                                  current_runtime_packages, sync_abi_metadata)
+from patch_ubuntu_control import (add_runtime_dependencies, add_device_library_dependency,
+                                  FFMPEG_RUNTIME, current_runtime_packages,
+                                  sync_abi_metadata)
 
 
 CONTROL = """Source: ffmpeg
@@ -77,6 +78,23 @@ class RuntimeDependsTests(unittest.TestCase):
             self.assertIn("libavdevice64 (= ${binary:Version})", metadata)
             self.assertIn("Package: libavdevice64", metadata)
             self.assertTrue((debian / "libavcodec64.install").exists())
+
+    def test_libavdevice_declares_raw1394_runtime_dependency(self):
+        updated = add_device_library_dependency(CONTROL, "libavdevice63")
+        self.assertIn(
+            "Package: libavdevice63\\nArchitecture: any\\n"
+            "Depends: ${shlibs:Depends}, ${misc:Depends},\\n"
+            " libraw1394-11\\n",
+            updated.replace("\n", "\\n"),
+        )
+        self.assertEqual(
+            updated, add_device_library_dependency(updated, "libavdevice63")
+        )
+        self.assertNotIn("Package: ffmpeg\\nArchitecture: any\\nDepends: libraw1394", updated)
+
+    def test_missing_device_stanza_refuses_broken_dependencies(self):
+        with self.assertRaises(ValueError):
+            add_device_library_dependency(CONTROL, "libavdevice64")
 
     def test_missing_binary_fails(self):
         with self.assertRaises(ValueError):

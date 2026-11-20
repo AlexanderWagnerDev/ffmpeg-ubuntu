@@ -70,6 +70,42 @@ def add_runtime_dependencies(control: str, packages: tuple[str, ...] = FFMPEG_RU
     return "".join(paragraphs)
 
 
+
+def add_device_library_dependency(
+    control: str, device_package: str, dependency: str = "libraw1394-11"
+) -> str:
+    """Declare runtime libraw1394 dependency on the package that ships libavdevice.
+
+    Debian's automatic shlibs dependency missed the dynamically linked library
+    on Ubuntu 26.04 and 26.10. The test container had an installable package but
+    ffmpeg could not load libraw1394.so.11 at startup.
+    """
+    paragraphs = re.split(r"(\n\n+)", control)
+    matches = 0
+    for index in range(0, len(paragraphs), 2):
+        paragraph = paragraphs[index]
+        if not re.search(rf"(?m)^Package: {re.escape(device_package)}$", paragraph):
+            continue
+        matches += 1
+        lines = paragraph.splitlines(keepends=True)
+        dep_positions = [i for i, line in enumerate(lines) if line.startswith("Depends:")]
+        if len(dep_positions) != 1:
+            raise ValueError(f"Expected one Depends field in {device_package}")
+        start = dep_positions[0]
+        end = start + 1
+        while end < len(lines) and lines[end][:1] in (" ", "\t"):
+            end += 1
+        dependency_field = "".join(lines[start:end])
+        if re.search(rf"(?<![A-Za-z0-9-]){re.escape(dependency)}(?![A-Za-z0-9-])",
+                     dependency_field):
+            continue
+        lines[end - 1] = lines[end - 1].rstrip("\n").rstrip().rstrip(",") + ",\n"
+        lines.insert(end, f" {dependency}\n")
+        paragraphs[index] = "".join(lines)
+    if matches != 1:
+        raise ValueError(f"Expected one {device_package} binary package, got {matches}")
+    return "".join(paragraphs)
+
 def current_runtime_packages(source_root: Path) -> tuple[str, ...]:
     """Resolve current library SONAME package names from upstream headers."""
     packages = []
@@ -142,6 +178,7 @@ def main() -> None:
     sync_abi_metadata(args.control.parent, packages)
     content = args.control.read_text(encoding="utf-8")
     updated = add_runtime_dependencies(content, packages)
+    updated = add_device_library_dependency(updated, packages[1])
     args.control.write_text(updated, encoding="utf-8")
     print("Verified FFmpeg runtime library and ABI dependencies")
 

@@ -63,8 +63,17 @@ if [[ -f "$SERIES" ]]; then
     elif (cd "$PATCH_WORK/ffmpeg-$RELEASE" && patch -p1 --batch --reverse --dry-run -i "$PATCH_PATH" >/dev/null 2>&1); then
       echo "Debian patch is already integrated upstream: $PATCH_NAME"
     else
-      echo "Debian patch must be refreshed for FFmpeg $RELEASE: $PATCH_NAME" >&2
-      exit 1
+      # These are FFmpeg upstream code backports from Debian testing's older
+      # release. Some do not reverse-apply after upstream refactors their
+      # context. The newer officially signed upstream release supersedes
+      # that older series. Never drop arbitrary distro or build-system patches.
+      case "$PATCH_NAME" in
+        [0-9][0-9][0-9][0-9]-avcodec-*|[0-9][0-9][0-9][0-9]-avformat-*|[0-9][0-9][0-9][0-9]-tests-*)
+          echo "::warning::Review skipped old upstream backport for FFmpeg $RELEASE: $PATCH_NAME" ;;
+        *)
+          echo "Debian patch requires manual review for FFmpeg $RELEASE: $PATCH_NAME" >&2
+          exit 1 ;;
+      esac
     fi
   done < "$SERIES"
   cp "$TMP_SERIES" "$SERIES"

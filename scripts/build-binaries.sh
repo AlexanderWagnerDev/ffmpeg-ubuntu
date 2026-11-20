@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build actual Ubuntu .deb files in a native-architecture Ubuntu 26.04 container.
+# Build actual Ubuntu .deb files in a native-architecture target Ubuntu container.
 # This process executes packaging scripts: do not inject signing credentials.
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SERIES="${1:-}"
 ARCH="${2:-}"
-[[ "$SERIES" == "resolute" && ( "$ARCH" == "amd64" || "$ARCH" == "arm64" ) ]] || {
-  echo "Usage: $0 resolute amd64|arm64" >&2
-  exit 2
+case "$SERIES" in
+  noble) RELEASE=24.04 ;;
+  resolute) RELEASE=26.04 ;;
+  stonking) RELEASE=26.10 ;;
+  *) echo "Usage: $0 noble|resolute|stonking amd64|arm64" >&2; exit 2 ;;
+esac
+[[ "$ARCH" == "amd64" || "$ARCH" == "arm64" ]] || {
+  echo "Architecture must be amd64 or arm64" >&2; exit 2;
 }
 case "$(uname -m):$ARCH" in
   x86_64:amd64|aarch64:arm64) ;;
@@ -29,7 +34,7 @@ docker run --rm \
   --mount "type=bind,src=$SOURCE_DIR,dst=/sources,readonly" \
   --mount "type=bind,src=$OUTPUT_DIR,dst=/output" \
   --env DEBIAN_FRONTEND=noninteractive \
-  ubuntu:26.04 bash -euo pipefail -c '
+  "ubuntu:$RELEASE" bash -euo pipefail -c '
     apt-get update -qq
     apt-get install -y --no-install-recommends build-essential fakeroot dpkg-dev ca-certificates
     apt-get build-dep -y /sources/ffmpeg_*.dsc

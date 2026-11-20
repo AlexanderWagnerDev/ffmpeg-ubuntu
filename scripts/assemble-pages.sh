@@ -20,6 +20,8 @@ mkdir -p "$SITE/pool/main/f/ffmpeg" "$SITE/dists/resolute/main/binary-amd64" \
   "$SITE/dists/resolute/main/binary-arm64"
 
 shopt -s nullglob
+expected_ffmpeg_version=""
+ffmpeg_arch_count=0
 for arch in amd64 arm64; do
   packages=("$INPUT_DIR/$arch"/*.deb)
   [[ "${#packages[@]}" -gt 0 ]] || { echo "No .deb files for $arch" >&2; exit 1; }
@@ -31,6 +33,14 @@ for arch in amd64 arm64; do
     source="$(dpkg-deb -f "$deb" Source 2>/dev/null || true)"
     source="${source%% *}"
     package="$(dpkg-deb -f "$deb" Package)"
+    if [[ "$package" == ffmpeg && "$binary_arch" == "$arch" ]]; then
+      version="$(dpkg-deb -f "$deb" Version)"
+      if [[ -n "$expected_ffmpeg_version" && "$version" != "$expected_ffmpeg_version" ]]; then
+        echo "FFmpeg package versions differ between amd64 and arm64" >&2; exit 1;
+      fi
+      expected_ffmpeg_version="$version"
+      ffmpeg_arch_count=$((ffmpeg_arch_count + 1))
+    fi
     [[ "$source" == ffmpeg || ( -z "$source" && "$package" == ffmpeg ) ]] || {
       echo "Unexpected upstream source for $package: $source" >&2; exit 1;
     }
@@ -45,6 +55,9 @@ for arch in amd64 arm64; do
     fi
   done
 done
+[[ "$ffmpeg_arch_count" -eq 2 ]] || {
+  echo "Exactly one ffmpeg binary per architecture is required" >&2; exit 1;
+}
 
 cd "$SITE"
 touch .nojekyll

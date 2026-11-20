@@ -4,9 +4,9 @@
 [![Binary builds](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/binary-ci.yml/badge.svg)](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/binary-ci.yml)
 [![GitHub Pages](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/pages-apt.yml/badge.svg)](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/pages-apt.yml)
 
-**Community-maintained FFmpeg 9 packages for Ubuntu.**
+**Automatically updated community-maintained FFmpeg packages for Ubuntu.**
 
-FFmpeg for Ubuntu rebuilds the multimedia toolkit and its libraries from Debian's FFmpeg source packaging for Ubuntu. Packages are distributed independently through a [Launchpad PPA](https://launchpad.net/~alexanderwagnerdev/+archive/ubuntu/ffmpeg) and a [signed GitHub Pages APT repository](https://alexanderwagnerdev.github.io/ffmpeg-ubuntu/).
+FFmpeg for Ubuntu builds the latest stable releases from officially signed FFmpeg source tarballs, using Debian's FFmpeg packaging as an Ubuntu starting point. New stable releases, including future major versions, are discovered automatically. Packages are distributed independently through a [Launchpad PPA](https://launchpad.net/~alexanderwagnerdev/+archive/ubuntu/ffmpeg) and a [signed GitHub Pages APT repository](https://alexanderwagnerdev.github.io/ffmpeg-ubuntu/).
 
 This is an independent project, not an official FFmpeg or Ubuntu distribution.
 
@@ -48,16 +48,18 @@ A **build target is not a guarantee that installable packages have been publishe
 
 The Debian FFmpeg source package produces the `ffmpeg` and `ffplay` tools, `ffprobe`, FFmpeg shared libraries, and development packages, subject to successful native builds and packaging options.
 
-- FFmpeg 9 audio/video encoding, decoding, transcoding and streaming.
+- Current stable FFmpeg audio/video encoding, decoding, transcoding and streaming.
 - APT-native dependency management and cryptographically signed repository metadata.
 - Native Ubuntu 26.04 AMD64 and ARM64 binary builds and installation tests.
 - Public source packaging automation and transparent build results.
 
 ## Build provenance
 
-The source package comes from the **signed Debian testing source index**. Ubuntu-specific packaging adjustments are applied during source preparation. Native binary builds, dependency checks, and clean-container installation tests are performed before the GitHub Pages channel can publish.
+Debian packaging comes from the **signed Debian testing source index**. When the official FFmpeg stable release is newer, its upstream-signed source tarball replaces Debian's older upstream source. Ubuntu-specific packaging and library ABI adjustments are applied during source preparation. Daily GitHub Actions cron checks detect newly available stable versions. Native binary builds, dependency checks, and clean-container installation tests must pass before the GitHub Pages channel can publish.
 
 Launchpad runs a separate binary build after accepting a signed source upload. Availability and results may differ across distribution channels.
+
+Major FFmpeg upgrades can require packaging changes; failed builds block publication rather than falling back to an older version.
 
 **Upstream:** [FFmpeg](https://ffmpeg.org/) · **Debian source:** [Debian FFmpeg](https://tracker.debian.org/pkg/ffmpeg) · **Automation:** [GitHub Actions](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions)
 

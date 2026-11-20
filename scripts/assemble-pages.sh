@@ -79,7 +79,7 @@ APT::FTPArchive::Release {
   Version "26.04";
   Architectures "amd64 arm64";
   Components "main";
-  Description "FFmpeg 9 Ubuntu 26.04 amd64/arm64 packages";
+  Description "FFmpeg Ubuntu 26.04 amd64/arm64 packages";
 };
 CONF
 apt-ftparchive -c release-config.conf release dists/resolute > dists/resolute/Release
@@ -111,7 +111,7 @@ cat > index.html <<'HTML'
 <body>
 <main>
 <h1>FFmpeg for Ubuntu</h1>
-<p>Signed FFmpeg 9 APT packages for Ubuntu 26.04 (resolute): AMD64 and ARM64.</p>
+<p>Signed FFmpeg APT packages for Ubuntu 26.04 (resolute): AMD64 and ARM64.</p>
 <p><a href="ffmpeg-ubuntu.gpg">Download APT repository public signing key</a></p>
 <p><a href="https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu">Source, security guidance and installation instructions</a></p>
 </main>

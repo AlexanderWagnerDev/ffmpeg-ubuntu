@@ -6,6 +6,8 @@ on:
       - 'scripts/build-binaries.sh'
       - 'scripts/test-binaries.sh'
       - 'scripts/build-source.sh'
+      - 'scripts/prepare-upstream.sh'
+      - 'scripts/latest_release.py'
       - 'scripts/patch_ubuntu_control.py'
       - 'scripts/check-build-deps.sh'
       - 'scripts/setup-build-env.sh'

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ensure FFmpeg 9 tools depend on their matching runtime libraries.
+"""Ensure FFmpeg tools depend on their matching runtime libraries.
 
 The Debian package's automatic shlibs dependencies were insufficient on the
 Ubuntu 26.04 rebuild: "apt install ffmpeg" produced an unstartable ffmpeg
@@ -141,7 +141,7 @@ def main() -> None:
     content = args.control.read_text(encoding="utf-8")
     updated = add_runtime_dependencies(content, packages)
     args.control.write_text(updated, encoding="utf-8")
-    print("Verified explicit FFmpeg 9 runtime library dependencies")
+    print("Verified FFmpeg runtime library and ABI dependencies")
 
 
 if __name__ == "__main__":

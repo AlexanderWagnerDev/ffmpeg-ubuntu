@@ -2,23 +2,33 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SITE="$ROOT/site"
-[[ -f "$SITE/ffmpeg-ubuntu.gpg" ]] || { echo "Missing signed APT site" >&2; exit 1; }
-gpgv --keyring "$SITE/ffmpeg-ubuntu.gpg" "$SITE/dists/resolute/InRelease"
+[[ -s "$SITE/ffmpeg-ubuntu.gpg" ]] || { echo "Missing public APT signing key" >&2; exit 1; }
 
-# Check both architectures with APT itself, but do not install packages.
-for arch in amd64 arm64; do
-  TMP="$(mktemp -d)"
-  mkdir -p "$TMP/lists/partial"
-  printf 'deb [signed-by=%s] file:%s resolute main\n' \
-    "$SITE/ffmpeg-ubuntu.gpg" "$SITE" > "$TMP/sources.list"
-  apt-get \
-    -o APT::Architecture="$arch" \
-    -o APT::Architectures="$arch" \
-    -o Dir::Etc::sourcelist="$TMP/sources.list" \
-    -o Dir::Etc::sourceparts=- \
-    -o Dir::State::Lists="$TMP/lists" \
-    -o APT::Get::List-Cleanup=0 \
-    update
-  rm -rf "$TMP"
+# Independently verify each signed release, then let APT parse both indexes
+# with the target architecture selected; no package installation is needed.
+for suite in noble resolute stonking; do
+  gpgv --keyring "$SITE/ffmpeg-ubuntu.gpg" "$SITE/dists/$suite/InRelease"
+  for arch in amd64 arm64; do
+    index="$SITE/dists/$suite/main/binary-$arch/Packages"
+    [[ -s "$index" && -s "$index.gz" ]] || {
+      echo "Missing APT package index for $suite/$arch" >&2; exit 1;
+    }
+    grep -q '^Package: ffmpeg$' "$index" || {
+      echo "No ffmpeg package in $suite/$arch" >&2; exit 1;
+    }
+    tmp="$(mktemp -d)"
+    mkdir -p "$tmp/lists/partial"
+    printf 'deb [signed-by=%s] file:%s %s main\n' \
+      "$SITE/ffmpeg-ubuntu.gpg" "$SITE" "$suite" > "$tmp/sources.list"
+    apt-get \
+      -o "APT::Architecture=$arch" \
+      -o "APT::Architectures=$arch" \
+      -o "Dir::Etc::sourcelist=$tmp/sources.list" \
+      -o Dir::Etc::sourceparts=- \
+      -o "Dir::State::Lists=$tmp/lists" \
+      -o APT::Get::List-Cleanup=0 \
+      update
+    rm -rf "$tmp"
+  done
 done
-echo "APT verified Release metadata and package indexes for amd64 and arm64"
+echo "Validated signed APT releases and six Ubuntu architecture indexes"

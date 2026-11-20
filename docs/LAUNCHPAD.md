@@ -1,107 +1,94 @@
-# Launchpad FFmpeg PPA: first-time setup and maintenance
+# Optional Launchpad PPA publishing
 
-The [Launchpad project](https://launchpad.net/awdev-ffmpeg) is **not** an APT archive.
-You must create a **separate public PPA** under the Launchpad user
-`alexanderwagnerdev` with **PPA URL name `ffmpeg`**. This is a one-time account action.
+This is an **alternative** to the standalone [GitHub Pages APT repository](GITHUB-PAGES.md).
+The [Launchpad project](https://launchpad.net/awdev-ffmpeg) is not itself a PPA.
 
-PPA (after it has been created):
-https://launchpad.net/~alexanderwagnerdev/+archive/ubuntu/ffmpeg
+Like [OpenRTMP/librtmp2](https://github.com/OpenRTMP/librtmp2/blob/main/.github/workflows/publish-ppa.yml),
+this repository publishes a signed **source package** with:
 
-## One-time setup
+```bash
+dput "ppa:alexanderwagnerdev/ffmpeg" <SIGNED_SOURCE_CHANGES_FILE>
+```
 
-1. Sign in to Launchpad; from your **user profile**, activate/create the new PPA `ffmpeg`.
-   Leave it public. Enable `amd64` and `arm64` in **Change details → Processors**;
-   amd64 is normally enabled by default but arm64 is not.
-2. Register a **dedicated CI OpenPGP public key** in your Launchpad account.
-   The public key must be accepted by Launchpad before publishing. Register a
-   **dedicated SSH public key** there too.
-3. Verify the **authentic server host key** for `ppa.launchpad.net` from a trusted
-   source before creating your `known_hosts` entry. Do not blindly trust a
-   fingerprint copied from an unauthenticated SSH scan.
-4. In GitHub, create an **Environment named `launchpad-ppa`** and add
-   the following **environment secrets**, not files committed to this repo:
+**No SSH private key, known_hosts secret, or Launchpad API token is needed.**
+Launchpad identifies authorized uploaders by the OpenPGP signature on the source upload.
+Launchpad builds final binary packages after accepting the source.
 
-   | Secret | Value |
+## One-time steps
+
+1. Sign in to the Launchpad profile controlling `alexanderwagnerdev`. Create a
+   **public PPA** with URL name `ffmpeg`, separate from the project
+   `awdev-ffmpeg`. The expected address is
+   https://launchpad.net/~alexanderwagnerdev/+archive/ubuntu/ffmpeg .
+   Enable amd64 and (if available/authorized for the PPA) arm64 processors.
+2. Register the **public part of your CI upload OpenPGP signing key** in
+   Launchpad and complete the confirmation/verification steps. You can
+   generate a dedicated key and upload its public portion to the Ubuntu
+   keyserver, then import its fingerprint in Launchpad's OpenPGP key settings.
+   Do not register a GitHub SSH key; this workflow does not use SSH.
+3. In [GitHub Environments](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/settings/environments),
+   create an Environment named **`launchpad-ppa`** and add only these two
+   **Environment secrets**:
+
+   | Secret | Content |
    |---|---|
-   | `PPA_GPG_PRIVATE_KEY_B64` | Base64 of the CI OpenPGP private-key export |
-   | `PPA_GPG_FINGERPRINT` | Full fingerprint registered with Launchpad |
-   | `PPA_SSH_PRIVATE_KEY` | Dedicated unencrypted CI Ed25519 private key (multiline) |
-   | `PPA_SSH_KNOWN_HOSTS` | Independently verified SSH host-key line for ppa.launchpad.net |
+   | `PPA_GPG_FINGERPRINT` | Full fingerprint of the OpenPGP upload key registered with Launchpad |
+   | `PPA_GPG_PRIVATE_KEY_B64` | Base64-encoded ASCII-armored export of its private key |
 
-   **Never paste or commit private keys.** A dedicated short-lived CI signing key
-   without an interactive passphrase is assumed; keep the key tightly scoped and
-   rotate/revoke it if compromised. Protect the GitHub Environment and
-   require human approval where appropriate.
+   On your trusted Ubuntu machine, for a dedicated unattended key already
+   installed at `~/.gnupg-ffmpeg-ppa`, you can retrieve both values:
 
-5. Run the **Publish to Launchpad PPA** workflow manually on `main` for
-   `resolute`. It first builds an **unsigned** source archive in a job without
-   credentials; a separate Environment-gated job checks Launchpad, signs the
-   artifact, and submits via SFTP.
+   ```bash
+   GPG_HOME="$HOME/.gnupg-ffmpeg-ppa"
+   GPG_FPR="$(gpg --homedir "$GPG_HOME" --batch --with-colons --list-secret-keys | awk -F: '$1 == "fpr" { print $10; exit }')"
+   printf 'PPA_GPG_FINGERPRINT=%s\n' "$GPG_FPR"
+   gpg --homedir "$GPG_HOME" --batch --armor --export-secret-keys "$GPG_FPR" | base64 -w0
+   echo
+   ```
 
-## Important upload behavior
+   **Never paste private keys into chat, commits, workflow logs, or issues.**
+   The workflow assumes an unencrypted unattended CI key; if the private key
+   is passphrase-protected, the signing command must be adapted with secure
+   loopback passphrase handling. Prefer a dedicated revocable CI signing key.
+4. Run [Publish to Launchpad PPA](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/publish-ppa.yml)
+   on `main` using `series=resolute` and `revision=1`.
+   The source package is built and validated in an unprivileged job; a
+   separate Environment-gated job imports the GPG key, runs `debsign`, then
+   `dput ppa:alexanderwagnerdev/ffmpeg`.
 
-- `awdev-ffmpeg-ppa` is an explicit `dput` SFTP profile created by the
-  workflow (username `alexanderwagnerdev`, incoming directory
-  `~alexanderwagnerdev/ubuntu/ffmpeg/`).
-- CI now also checks whether the target Ubuntu archive can resolve declared source build dependencies using an isolated Ubuntu Docker container. This is **not** a complete binary-build or ABI test. A failed dependency check blocks publication until compatibility is addressed.
-- Launchpad accepts source uploads only. It builds and publishes the final
-  `.deb` files; an accepted upload is **not** proof that a binary build succeeds.
-- A public API check prevents attempting to reupload an identical or older
-  version in the same Ubuntu suite. If Launchpad cannot be reached or the PPA
-  does not exist, the check **fails closed**.
-- For an existing source version with a failed binary build, increase the
-  workflow's `revision` parameter from `1` to `2`, etc. A unique source
-  version is required for every new upload.
-- `jammy` and `noble` are **experimental** until their build-dependency and
-  ABI compatibility is established; do not assume Debian testing packages will
-  compile on these older releases.
-- Once the first `resolute` upload has been accepted, the packages compile,
-  and installation has been tested, you can opt into automatic weekly
-  publication: GitHub **Settings → Secrets and variables → Actions → Variables**
-  → create repository variable **`PPA_AUTO_PUBLISH=true`**. Keep it disabled
-  until that first successful end-to-end validation. The schedule is guarded
-  and does **not** attempt a publishing run when the variable is missing.
-  Required Environment reviewers (if configured) still apply.
+## After upload
 
-## Verify end-to-end after publication
+An accepted source upload **does not guarantee a successful binary build**.
+Review Launchpad's acceptance and per-architecture build logs and test an
+installation in a disposable Ubuntu 26.04 system. If an already accepted
+version needs to be re-uploaded after a packaging fix, increase `revision`.
+The `noble` and `jammy` targets are experimental; they require separate
+successful compatibility tests.
 
-Use Launchpad's PPA package page to verify the **amd64** and **arm64** build
-statuses; they can fail independently.
-
-On a clean disposable Ubuntu 26.04 machine:
+Once successful, a client can use:
 
 ```bash
 sudo add-apt-repository ppa:alexanderwagnerdev/ffmpeg
 sudo apt update
 apt-cache policy ffmpeg
 sudo apt -s install ffmpeg
-sudo apt install ffmpeg
-ffmpeg -version
-ffprobe -version
 ```
 
-If Ubuntu ESM or another repository has a higher APT priority, inspect
-`apt-cache policy ffmpeg` and implement narrowly scoped pinning. Do **not**
-disable Ubuntu security updates globally.
+Only after confirming package publication and installation should you enable
+`PPA_AUTO_PUBLISH=true` in GitHub Actions repository **variables** for
+scheduled uploads. Without that variable, the scheduled job does not publish.
 
-## Ubuntu 26.04 packaging adjustment
+## Packaging details
 
-Debian testing currently declares `debhelper-compat (= 14)` for FFmpeg 9. The Resolute source build changes that requirement to `debhelper-compat (= 13)` before generating a source upload. This resolved the Ubuntu 26.04 dependency-resolution check, but **does not prove a successful binary build**. Review Launchpad build logs after uploading.
+The source build obtains FFmpeg 9's Debian source package from the signed
+Debian testing source index. For Ubuntu 26.04, it currently adjusts
+`debhelper-compat (= 14)` to level 13 before creating the package.
+A source build and an APT build-dependency simulation are **not** a substitute
+for a successful Launchpad binary build.
 
-## Provenance and limitations
+This PPA upload method intentionally matches the one already used in
+OpenRTMP/librtmp2. It uses only OpenPGP signing; GitHub Pages uses a separate
+key for signing APT repository metadata.
 
-The source build uses the **signed Debian testing `deb-src` index** and
-inherits Debian's `debian/` package definitions, patches, and build flags.
-No Debian binary archive is added to the build runner. The upstream FFmpeg
-tarball may carry a separate detached signature; the Debian archive signature
-provides the trusted source-index provenance, **not an independent upstream
-signature verification**.
-
-The CI builds and validates source packages. It does not guarantee that every
-binary, library dependency, codec feature, or target architecture will build.
-Review Debian copyright/licensing before publishing FFmpeg binaries.
-
-Documentation:
-- https://ubuntu.com/docs/launchpad/user/how-to/packaging/ppa-package-upload/
-- https://ubuntu.com/docs/launchpad/user/reference/packaging/ppas/ppa/
-- https://ubuntu.com/docs/launchpad/user/explanation/packaging/package-upload-errors/
+- [Ubuntu Launchpad PPA upload documentation](https://ubuntu.com/docs/launchpad/user/how-to/packaging/ppa-package-upload/)
+- [OpenRTMP's existing PPA workflow](https://github.com/OpenRTMP/librtmp2/blob/main/.github/workflows/publish-ppa.yml)

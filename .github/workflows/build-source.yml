@@ -31,7 +31,6 @@ jobs:
         series: [noble, resolute, stonking]
     name: Source package ${{ matrix.series }}
     runs-on: ubuntu-latest
-    timeout-minutes: 75
     env:
       SERIES: ${{ matrix.series }}
       REVISION: ${{ inputs.revision || '1' }}

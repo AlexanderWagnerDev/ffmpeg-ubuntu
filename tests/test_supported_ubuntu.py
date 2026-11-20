@@ -58,6 +58,23 @@ class SupportedUbuntuTests(unittest.TestCase):
                 self.assertIn("  workflow_call:", text)
                 self.assertIn(f"uses: ./.github/workflows/{workflow}", pipeline)
 
+    def test_channel_check_failures_do_not_block_other_channel(self):
+        workflows = ROOT / ".github/workflows"
+        checker = (workflows / "check-release.yml").read_text()
+        pipeline = (workflows / "release-pipeline.yml").read_text()
+        self.assertEqual(checker.count("        continue-on-error: true"), 2)
+        self.assertIn("steps.pages.outcome", checker)
+        self.assertIn("steps.ppa.outcome", checker)
+        self.assertIn("  check-health:", pipeline)
+        self.assertIn("needs.check.outputs.pages_check", pipeline)
+        self.assertIn("needs.check.outputs.ppa_check", pipeline)
+
+    def test_pages_downgrades_are_checked_before_deployment(self):
+        text = (ROOT / ".github/workflows/pages-apt.yml").read_text()
+        self.assertIn("check_pages_downgrade.py --site site", text)
+        self.assertIn("if: steps.version-guard.outputs.deploy == 'true'", text)
+        self.assertIn("if: needs.sign.outputs.deploy == 'true'", text)
+
     def test_retired_release_is_not_configured(self):
         paths = (
             list((ROOT / "scripts").glob("*.sh")) +

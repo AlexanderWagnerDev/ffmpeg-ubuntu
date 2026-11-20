@@ -63,7 +63,7 @@ cd "$SOURCE_DIR"
 dch --newversion "$NEW_VERSION" --distribution "$SERIES" --force-distribution \
   "Rebuild Debian FFmpeg 9 source for Ubuntu $SERIES (PPA revision $REVISION)."
 # -d skips build-dependency checks for SOURCE generation only.
-# Actual dependency resolution/builds are the job of Launchpad.
+# Binary builds and runtime dependency tests run separately (Pages or Launchpad).
 dpkg-buildpackage -S -sa -us -uc -d
 
 # Only stage files from the newly generated Ubuntu package. apt-get source

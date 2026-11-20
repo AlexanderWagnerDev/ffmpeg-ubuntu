@@ -17,8 +17,8 @@ def ubuntu_version(debian_version: str, series: str, revision: int) -> str:
     if not match:
         raise ValueError(f"Invalid Debian source version: {debian_version}")
     upstream = match.group("upstream")
-    if not (upstream.startswith("9.") and upstream[2:3].isdigit()):
-        raise ValueError(f"Expected FFmpeg 9.x, got {upstream}")
+    if int(upstream.split(".", 1)[0]) < 9:
+        raise ValueError(f"Unsupported FFmpeg release: {upstream}")
     return f"{debian_version}+ubuntu{SERIES[series]}~ppa{revision}"
 
 

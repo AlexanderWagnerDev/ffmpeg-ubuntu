@@ -16,6 +16,9 @@ from urllib.request import Request, urlopen
 
 BASE = "https://api.launchpad.net/devel"
 SAFE_NAME = re.compile(r"^[a-z][a-z0-9-]*$")
+# Do not count removed records as currently available for release discovery.
+# Retain them in upload-conflict detection: Launchpad can reject reused versions.
+REMOVED_SOURCE_STATUSES = frozenset({"Deleted", "Obsolete"})
 
 
 def read_changes(path: Path) -> tuple[str, str]:
@@ -41,7 +44,9 @@ def greater_or_equal(current: str, candidate: str) -> bool:
     return result.returncode == 0
 
 
-def fetch_versions(owner: str, archive: str, series: str) -> list[str]:
+def fetch_versions(
+    owner: str, archive: str, series: str, *, exclude_removed: bool = False
+) -> list[str]:
     for label, value in (("owner", owner), ("archive", archive), ("series", series)):
         if not SAFE_NAME.fullmatch(value):
             raise ValueError(f"Invalid {label}: {value!r}")
@@ -65,6 +70,8 @@ def fetch_versions(owner: str, archive: str, series: str) -> list[str]:
         if not isinstance(body, dict) or not isinstance(body.get("entries"), list):
             raise ValueError("Unexpected Launchpad API response")
         for entry in body["entries"]:
+            if exclude_removed and entry.get("status") in REMOVED_SOURCE_STATUSES:
+                continue
             version = entry.get("source_package_version")
             if isinstance(version, str):
                 versions.append(version)

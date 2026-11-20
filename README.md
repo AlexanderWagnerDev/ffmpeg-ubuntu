@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/ci.yml/badge.svg)](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/ci.yml)
 [![Binary builds](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/binary-ci.yml/badge.svg)](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/binary-ci.yml)
-[![GitHub Pages](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/pages-apt.yml/badge.svg)](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/pages-apt.yml)
+[![Release pipeline](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/release-pipeline.yml/badge.svg)](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/release-pipeline.yml)
 
 **Automatically updated community-maintained FFmpeg packages for Ubuntu.**
 
@@ -42,6 +42,24 @@ See the [installation guide](docs/INSTALLATION.md) for the public keyring, APT s
 | **26.04 LTS (Resolute)** | Build target | Build target |
 | **26.10 (Stonking)** | Build target | Build target |
 
+### Launchpad PPA architecture coverage
+
+The **Launchpad PPA** builds binary packages from one signed source upload per Ubuntu release, using the processor architectures enabled in the PPA's Launchpad settings. The intended PPA architecture set is:
+
+| Architecture | Ubuntu 24.04 | Ubuntu 26.04 | Ubuntu 26.10 |
+|---|---|---|---|
+| `amd64` | Eligible | Eligible | Eligible |
+| `amd64v3` | Not supported | Eligible | Eligible |
+| `arm64` | Eligible | Eligible | Eligible |
+| `armhf` | Eligible | Eligible | Eligible |
+| `ppc64el` | Eligible | Eligible | Eligible |
+| `riscv64` | Eligible | Eligible | Eligible |
+| `s390x` | Eligible | Eligible | Eligible |
+
+**Eligible does not mean enabled, built, or published.** Visit the [FFmpeg PPA](https://launchpad.net/~alexanderwagnerdev/+archive/ubuntu/ffmpeg), select **Change details → Processors**, and enable each available architecture. Some architectures or variants may require Launchpad permission. Verify the resulting package build status separately for each Ubuntu release and architecture; the automated source upload does not wait for Launchpad builds to finish. Already uploaded source package versions may require a new upload with a higher package revision (or an appropriate Launchpad rebuild mechanism) to trigger newly enabled architectures.
+
+The **GitHub Pages APT repository** remains independently built and smoke-tested for only `amd64` and `arm64` on all three Ubuntu releases. Unlike Launchpad, GitHub-hosted Linux runners do not provide native builders for all of the other targets, so additional architecture builds require separate build infrastructure and tests. Do not advertise additional architectures as available on GitHub Pages until they have actually been published.
+
 A **build target is not a guarantee that installable packages have been published**. Check the [workflow results](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions) and [PPA package status](https://launchpad.net/~alexanderwagnerdev/+archive/ubuntu/ffmpeg).
 
 ## Packages and features
@@ -53,9 +71,47 @@ The Debian FFmpeg source package produces the `ffmpeg` and `ffplay` tools, `ffpr
 - AMD64 and ARM64 binary builds and installation tests for Ubuntu 24.04, 26.04 and 26.10.
 - Public source packaging automation and transparent build results.
 
+## Automated release pipeline
+
+The [FFmpeg release pipeline](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/release-pipeline.yml) is the **only scheduled publishing entry point**. It runs a daily upstream check (GitHub Actions schedules runs using cron and may delay the actual start) and is also available through **Actions → FFmpeg release pipeline → Run workflow** on the `main` branch.
+
+1. **Check:** Compare the latest official stable FFmpeg release against the published versions in both channels.
+2. **Build and test:** If either channel needs an update, prepare source packages for Noble, Resolute, and Stonking; then build and smoke-test all six native Ubuntu/architecture combinations. All builds must pass.
+3. **Publish:** Only after all tests pass, sign and deploy the GitHub Pages APT repository and/or sign and upload sources to the Launchpad PPA, depending on which channel needs updating.
+
+The stages use [reusable GitHub Actions workflows](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows). Source and binary artifacts stay in the **same pipeline run**, rather than rebuilding separately for each publication channel. If neither channel needs updating, the pipeline exits without building.
+
+Manual runs accept a positive `revision` (default `1`) and a `force` toggle (default `false`). Set `force=true` to rebuild even if the stable version is already published; the Launchpad publisher still refuses to upload a duplicate or older package version. Increase `revision` when deliberately rebuilding an already published upstream version.
+
+The source-package and binary validation workflows remain available for development CI, but have **no independent release schedule**. The signing secrets must be configured before publishing; Launchpad's subsequent builds are asynchronous and may still fail or require time to become available.
+
+### Package version format
+
+The Ubuntu rebuilds use short, codename-tagged Debian versions without the old `+ubuntuXX.XX~ppaN` suffix. For example, FFmpeg `7:9.0.2-6` with package revision `1` becomes:
+
+| Ubuntu release | Package version |
+|---|---|
+| 24.04 Noble | `7:9.0.2-6.1~noble` |
+| 26.04 Resolute | `7:9.0.2-6.1~resolute` |
+| 26.10 Stonking | `7:9.0.2-6.1~stonking` |
+
+Revision `2` gives `-6.2~resolute`, and so on. The package version includes Debian's epoch and packaging revision; it is intentionally not just the upstream FFmpeg version. Debian's version comparator confirms the new `-6.1~resolute` revision is higher than the previous `-6+ubuntu26.04~ppa1` package, preserving upgrades for existing installations. The central daily check triggers a one-time republish when only the old suffix exists for the latest upstream release; subsequent checks skip once a matching current-scheme version is published. Rebuilding a *previously published* package still requires a new revision.
+
+### Publication safeguards
+
+The GitHub Pages and Launchpad version checks run **independently**. If either service is unreachable, its own publishing channel is blocked while the other can still build and publish. The overall pipeline reports the failed check as an error instead of silently reporting success.
+
+Before deployment, the Pages publisher compares the candidate `ffmpeg` Debian package version against the **live APT index** for all six supported Ubuntu/architecture targets using `dpkg --compare-versions`. If even one candidate is older than the public version, the complete Pages deployment is skipped; the Launchpad PPA upload can proceed independently.
+
+For Launchpad, `Deleted` and `Obsolete` source records do **not** count as current published releases. The duplicate-upload guard still accounts for historical uploaded versions, including `Superseded`, because Launchpad may reject a reused version number. If a previously uploaded package was removed, publish a new package revision instead of reusing its exact version.
+
+### Release changelog
+
+Every Ubuntu source package now includes the **official FFmpeg release notes** for its exact upstream version in `debian/changelog`, in addition to the Ubuntu packaging/rebuild entry. The notes are read directly from the source tree's upstream `Changelog` (the official signed FFmpeg tarball when updated, or the signed Debian source when already current), not a separately scraped web summary. The PPA package's **Changelog** shows the release-specific features and fixes for each Ubuntu version, rather than just a generic rebuild line. If the exact release section cannot be found, the build fails rather than publishing misleading notes.
+
 ## Build provenance
 
-Debian packaging comes from the **signed Debian testing source index**. When the official FFmpeg stable release is newer, its upstream-signed source tarball replaces Debian's older upstream source. Ubuntu-specific packaging and library ABI adjustments are applied during source preparation. Daily GitHub Actions cron checks detect newly available stable versions. Native binary builds, dependency checks, and clean-container installation tests must pass before the GitHub Pages channel can publish.
+Debian packaging comes from the **signed Debian testing source index**. When the official FFmpeg stable release is newer, its upstream-signed source tarball replaces Debian's older upstream source. Ubuntu-specific packaging and library ABI adjustments are applied during source preparation. A single daily GitHub Actions cron checks both publication channels for new stable versions. Native binary builds, dependency checks, and clean-container installation tests must pass before the GitHub Pages channel can publish.
 
 Launchpad runs a separate binary build after accepting a signed source upload. Availability and results may differ across distribution channels.
 

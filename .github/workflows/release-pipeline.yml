@@ -1,0 +1,101 @@
+name: FFmpeg release pipeline
+
+on:
+  schedule:
+    # Daily (GitHub Actions requires a 5-field cron expression).
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild and republish even when the stable version is unchanged
+        type: boolean
+        required: true
+        default: false
+      revision:
+        description: Positive Ubuntu package revision (raise to rebuild an existing version)
+        type: string
+        required: true
+        default: '1'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: ffmpeg-release-pipeline
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check latest FFmpeg and published versions
+    uses: ./.github/workflows/check-release.yml
+    with:
+      force: ${{ inputs.force || false }}
+    permissions:
+      contents: read
+
+  build:
+    needs: check
+    if: needs.check.outputs.build == 'true'
+    name: Build and test all Ubuntu packages
+    uses: ./.github/workflows/build-release.yml
+    with:
+      revision: ${{ inputs.revision || '1' }}
+    permissions:
+      contents: read
+
+  pages:
+    needs: [check, build]
+    if: needs.check.outputs.pages == 'true'
+    name: Sign and publish GitHub Pages APT
+    uses: ./.github/workflows/pages-apt.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    secrets:
+      PAGES_APT_GPG_PRIVATE_KEY_B64: ${{ secrets.PAGES_APT_GPG_PRIVATE_KEY_B64 }}
+      PAGES_APT_GPG_FINGERPRINT: ${{ secrets.PAGES_APT_GPG_FINGERPRINT }}
+
+  ppa:
+    needs: [check, build]
+    if: needs.check.outputs.ppa == 'true'
+    name: Sign and upload Launchpad PPA sources
+    uses: ./.github/workflows/publish-ppa.yml
+    permissions:
+      contents: read
+    secrets:
+      PPA_GPG_PRIVATE_KEY_B64: ${{ secrets.PPA_GPG_PRIVATE_KEY_B64 }}
+      PPA_GPG_FINGERPRINT: ${{ secrets.PPA_GPG_FINGERPRINT }}
+
+  check-health:
+    needs: [check, build, pages, ppa]
+    if: always()
+    name: Report release-check failures
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Fail if either publication channel could not be checked
+        shell: bash
+        env:
+          CHECK_RESULT: ${{ needs.check.result }}
+          PAGES_CHECK: ${{ needs.check.outputs.pages_check }}
+          PPA_CHECK: ${{ needs.check.outputs.ppa_check }}
+        run: |
+          set -euo pipefail
+          failed=0
+          if [[ "$CHECK_RESULT" != 'success' ]]; then
+            echo "::error::Release decision job failed: $CHECK_RESULT"
+            failed=1
+          fi
+          if [[ "$PAGES_CHECK" != 'success' ]]; then
+            echo "::error::GitHub Pages version check failed; Pages publishing was blocked"
+            failed=1
+          fi
+          if [[ "$PPA_CHECK" != 'success' ]]; then
+            echo "::error::Launchpad PPA version check failed; PPA publishing was blocked"
+            failed=1
+          fi
+          exit "$failed"

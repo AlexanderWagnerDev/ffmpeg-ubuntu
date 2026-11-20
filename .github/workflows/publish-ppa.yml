@@ -1,107 +1,23 @@
 name: Publish to Launchpad PPA
 
 on:
-  workflow_dispatch:
-    inputs:
-      series:
-        description: Ubuntu release (all by default)
-        type: choice
+  workflow_call:
+    secrets:
+      PPA_GPG_PRIVATE_KEY_B64:
         required: true
-        default: all
-        options:
-          - all
-          - noble
-          - resolute
-          - stonking
-      revision:
-        description: Package revision (increase for rebuilt upstream versions)
-        type: string
+      PPA_GPG_FINGERPRINT:
         required: true
-        default: '1'
-  schedule:
-    - cron: '31 5 * * *'
 
 permissions:
   contents: read
 
-concurrency:
-  group: ffmpeg-ppa-publish
-  cancel-in-progress: false
-
 jobs:
-  check-upstream:
-    name: Check stable FFmpeg and select Ubuntu releases
-    runs-on: ubuntu-latest
-    outputs:
-      update: ${{ steps.select.outputs.update }}
-      series: ${{ steps.select.outputs.series }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Select supported Ubuntu releases
-        id: select
-        shell: bash
-        env:
-          REQUESTED_SERIES: ${{ inputs.series || 'all' }}
-          EVENT_NAME: ${{ github.event_name }}
-        run: |
-          set -euo pipefail
-          if [[ "$EVENT_NAME" == schedule ]]; then
-            python3 scripts/needs_release.py --channel ppa
-          else
-            echo 'update=true' >> "$GITHUB_OUTPUT"
-          fi
-          case "$REQUESTED_SERIES" in
-            all) echo 'series=["noble","resolute","stonking"]' >> "$GITHUB_OUTPUT" ;;
-            noble|resolute|stonking) echo "series=[\"$REQUESTED_SERIES\"]" >> "$GITHUB_OUTPUT" ;;
-            *) echo "Unsupported Ubuntu release" >&2; exit 2 ;;
-          esac
-
-  prepare:
-    needs: check-upstream
-    if: needs.check-upstream.outputs.update == 'true' && github.ref == 'refs/heads/main'
-    name: Prepare ${{ matrix.series }} source
-    strategy:
-      fail-fast: false
-      matrix:
-        series: ${{ fromJSON(needs.check-upstream.outputs.series) }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 75
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Verify package revision
-        env:
-          REVISION: ${{ inputs.revision || '1' }}
-        run: |
-          [[ "$REVISION" =~ ^[1-9][0-9]*$ ]] || exit 2
-      - name: Configure verified source archives
-        run: sudo bash scripts/setup-build-env.sh
-      - name: Build FFmpeg source for ${{ matrix.series }}
-        env:
-          REVISION: ${{ inputs.revision || '1' }}
-        run: bash scripts/build-source.sh "${{ matrix.series }}" "$REVISION"
-      - name: Validate package and target Ubuntu build dependencies
-        run: |
-          bash scripts/verify-source.sh "${{ matrix.series }}"
-          bash scripts/check-build-deps.sh "${{ matrix.series }}"
-      - name: Upload verified unsigned source
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: ffmpeg-ppa-source-${{ matrix.series }}
-          path: dist/${{ matrix.series }}/
-          if-no-files-found: error
-          retention-days: 3
-
   publish:
-    needs: [check-upstream, prepare]
     name: Upload ${{ matrix.series }} to Launchpad
     strategy:
       fail-fast: false
       matrix:
-        series: ${{ fromJSON(needs.check-upstream.outputs.series) }}
+        series: [noble, resolute, stonking]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -111,7 +27,7 @@ jobs:
       - name: Download source package for this Ubuntu release
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: ffmpeg-ppa-source-${{ matrix.series }}
+          name: ffmpeg-source-${{ matrix.series }}
           path: dist/${{ matrix.series }}
       - name: Install publication tools
         run: |

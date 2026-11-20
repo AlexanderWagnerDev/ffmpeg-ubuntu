@@ -18,19 +18,62 @@ class SupportedUbuntuTests(unittest.TestCase):
         self.assertEqual(versions.SERIES, SERIES)
 
     def test_source_workflows_list_all_three(self):
-        for workflow in ("build-source.yml", "publish-ppa.yml", "pages-apt.yml"):
+        for workflow in ("build-source.yml", "build-release.yml", "publish-ppa.yml"):
             text = (ROOT / ".github/workflows" / workflow).read_text()
             for suite in SERIES:
                 with self.subTest(workflow=workflow, suite=suite):
                     self.assertIn(suite, text)
 
     def test_native_architecture_matrix(self):
-        for workflow in ("binary-ci.yml", "pages-apt.yml"):
+        for workflow in ("binary-ci.yml", "build-release.yml"):
             text = (ROOT / ".github/workflows" / workflow).read_text()
             for suite in SERIES:
                 for arch in ("amd64", "arm64"):
                     with self.subTest(workflow=workflow, suite=suite, arch=arch):
                         self.assertIn(f"- series: {suite}\n            arch: {arch}", text)
+
+    def test_only_pipeline_has_a_release_schedule(self):
+        workflows = ROOT / ".github/workflows"
+        scheduled = [
+            path.name
+            for path in workflows.glob("*.yml")
+            if "  schedule:" in path.read_text()
+        ]
+        self.assertEqual(scheduled, ["release-pipeline.yml"])
+
+    def test_release_steps_are_reusable_and_ordered(self):
+        workflows = ROOT / ".github/workflows"
+        pipeline = (workflows / "release-pipeline.yml").read_text()
+        self.assertIn("  workflow_dispatch:", pipeline)
+        self.assertIn("    needs: check", pipeline)
+        self.assertEqual(pipeline.count("    needs: [check, build]"), 2)
+        for workflow in (
+            "check-release.yml",
+            "build-release.yml",
+            "pages-apt.yml",
+            "publish-ppa.yml",
+        ):
+            with self.subTest(workflow=workflow):
+                text = (workflows / workflow).read_text()
+                self.assertIn("  workflow_call:", text)
+                self.assertIn(f"uses: ./.github/workflows/{workflow}", pipeline)
+
+    def test_channel_check_failures_do_not_block_other_channel(self):
+        workflows = ROOT / ".github/workflows"
+        checker = (workflows / "check-release.yml").read_text()
+        pipeline = (workflows / "release-pipeline.yml").read_text()
+        self.assertEqual(checker.count("        continue-on-error: true"), 2)
+        self.assertIn("steps.pages.outcome", checker)
+        self.assertIn("steps.ppa.outcome", checker)
+        self.assertIn("  check-health:", pipeline)
+        self.assertIn("needs.check.outputs.pages_check", pipeline)
+        self.assertIn("needs.check.outputs.ppa_check", pipeline)
+
+    def test_pages_downgrades_are_checked_before_deployment(self):
+        text = (ROOT / ".github/workflows/pages-apt.yml").read_text()
+        self.assertIn("check_pages_downgrade.py --site site", text)
+        self.assertIn("if: steps.version-guard.outputs.deploy == 'true'", text)
+        self.assertIn("if: needs.sign.outputs.deploy == 'true'", text)
 
     def test_retired_release_is_not_configured(self):
         paths = (

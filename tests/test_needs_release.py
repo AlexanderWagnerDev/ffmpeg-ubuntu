@@ -15,6 +15,29 @@ class PublicationTests(unittest.TestCase):
         self.assertFalse(publication_needs_update("9.1", ["7:9.1-0+ubuntu26.04~ppa1"]))
         self.assertTrue(publication_needs_update("9.1.1", ["7:9.1-0+ubuntu26.04~ppa1"]))
 
+    def test_old_suffix_triggers_one_time_migration(self):
+        old = ["7:9.0.2-6+ubuntu26.04~ppa1"]
+        self.assertTrue(publication_needs_update("9.0.2", old, "resolute"))
+        self.assertFalse(publication_needs_update(
+            "9.0.2", ["7:9.0.2-6.1~resolute"], "resolute"
+        ))
+        self.assertFalse(publication_needs_update(
+            "9.0.2",
+            ["7:9.0.2-6+ubuntu26.04~ppa1", "7:9.0.2-6.1~resolute"],
+            "resolute",
+        ))
+
+    def test_release_check_does_not_downgrade_upstream(self):
+        self.assertFalse(publication_needs_update(
+            "9.0.2", ["7:9.1-0.1~resolute"], "resolute"
+        ))
+
+    def test_release_check_validates_target_suite(self):
+        with self.assertRaises(ValueError):
+            publication_needs_update(
+                "9.0.2", ["7:9.0.2-6.1~resolute"], "oracular"
+            )
+
     def test_first_publication(self):
         self.assertTrue(publication_needs_update("9.1", []))
 

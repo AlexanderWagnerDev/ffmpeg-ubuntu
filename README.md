@@ -55,7 +55,7 @@ The Debian FFmpeg source package produces the `ffmpeg` and `ffplay` tools, `ffpr
 
 ## Automated release pipeline
 
-The [FFmpeg release pipeline](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/release-pipeline.yml) is the **only scheduled publishing entry point**. It runs a daily upstream check at **07:13 UTC** and is also available through **Actions → FFmpeg release pipeline → Run workflow** on the `main` branch.
+The [FFmpeg release pipeline](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/release-pipeline.yml) is the **only scheduled publishing entry point**. It runs a daily upstream check (GitHub Actions schedules runs using cron and may delay the actual start) and is also available through **Actions → FFmpeg release pipeline → Run workflow** on the `main` branch.
 
 1. **Check:** Compare the latest official stable FFmpeg release against the published versions in both channels.
 2. **Build and test:** If either channel needs an update, prepare source packages for Noble, Resolute, and Stonking; then build and smoke-test all six native Ubuntu/architecture combinations. All builds must pass.
@@ -66,6 +66,10 @@ The stages use [reusable GitHub Actions workflows](https://docs.github.com/en/ac
 Manual runs accept a positive `revision` (default `1`) and a `force` toggle (default `false`). Set `force=true` to rebuild even if the stable version is already published; the Launchpad publisher still refuses to upload a duplicate or older package version. Increase `revision` when deliberately rebuilding an already published upstream version.
 
 The source-package and binary validation workflows remain available for development CI, but have **no independent release schedule**. The signing secrets must be configured before publishing; Launchpad's subsequent builds are asynchronous and may still fail or require time to become available.
+
+### Release changelog
+
+Every Ubuntu source package now includes the **official FFmpeg release notes** for its exact upstream version in `debian/changelog`, in addition to the Ubuntu packaging/rebuild entry. The notes are read directly from the source tree's upstream `Changelog` (the official signed FFmpeg tarball when updated, or the signed Debian source when already current), not a separately scraped web summary. The PPA package's **Changelog** shows the release-specific features and fixes for each Ubuntu version, rather than just a generic rebuild line. If the exact release section cannot be found, the build fails rather than publishing misleading notes.
 
 ## Build provenance
 

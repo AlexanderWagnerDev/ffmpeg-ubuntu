@@ -81,7 +81,7 @@ def main() -> None:
     needed = False
     for series in SERIES:
         if args.channel == "ppa":
-            versions = fetch_versions("alexanderwagnerdev", "ffmpeg", series)
+            versions = fetch_versions("alexanderwagnerdev", "ffmpeg", series, exclude_removed=True)
         else:
             versions = get_pages_versions(series)
         changed = publication_needs_update(latest, versions, series)

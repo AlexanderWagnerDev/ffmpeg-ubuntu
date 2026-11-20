@@ -4,6 +4,8 @@ Packages target **Ubuntu 24.04 LTS (Noble), 26.04 LTS (Resolute), and 26.10 (Sto
 
 ## Option 1: Launchpad PPA
 
+Launchpad supports building source uploads for `amd64`, `amd64v3`, `arm64`, `armhf`, `ppc64el`, `riscv64`, and `s390x`, if enabled for this PPA and supported for the Ubuntu release. `amd64v3` is not available on Ubuntu 24.04. These architectures are **not guaranteed to have successful FFmpeg builds**, so check [the PPA's published packages](https://launchpad.net/~alexanderwagnerdev/+archive/ubuntu/ffmpeg/+packages) for your particular Ubuntu version and hardware before installing.
+
 Check the [FFmpeg PPA](https://launchpad.net/~alexanderwagnerdev/+archive/ubuntu/ffmpeg) for published packages matching your Ubuntu release.
 
 ```bash

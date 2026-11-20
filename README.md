@@ -3,14 +3,15 @@
 [![CI](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/ci.yml/badge.svg)](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/ci.yml)
 [![Build source](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/build-source.yml/badge.svg)](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/build-source.yml)
 
-Ubuntu/Launchpad PPA source packaging for **FFmpeg 9**, maintained by AlexanderWagnerDev.
+Ubuntu source and binary packaging for **FFmpeg 9**, with two independent distribution methods: **signed GitHub Pages APT repository** (without Launchpad) and an optional **Launchpad PPA**.
 
-**Status:** FFmpeg 9.0.2 source-package generation and verification work on GitHub CI. **No Launchpad binary PPA publication has been verified yet.** This repository does not itself host downloadable `.deb` files. Refer to the [Actions runs](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions) for live status.
+**Status:** FFmpeg 9.0.2 source-package generation and Ubuntu 26.04 build-dependency resolution have passed CI. Native AMD64 and ARM64 binary builds and signed GitHub Pages APT publication are now implemented but **not yet confirmed successful end-to-end**. Do not use the Pages APT URL until the first deployment passes. Launchpad is optional; no Launchpad binary build is verified yet.
 
 | Link | Purpose |
 |---|---|
 | [Launchpad project](https://launchpad.net/awdev-ffmpeg) | Project identity and information |
-| [Planned public PPA](https://launchpad.net/~alexanderwagnerdev/+archive/ubuntu/ffmpeg) | Actual APT package publishing, once created and populated |
+| [GitHub Pages APT](https://alexanderwagnerdev.github.io/ffmpeg-ubuntu/) | Independent signed APT repository, after deployment succeeds |
+| [Optional PPA](https://launchpad.net/~alexanderwagnerdev/+archive/ubuntu/ffmpeg) | Alternative package publishing if separately set up |
 | [FFmpeg upstream](https://ffmpeg.org/) | Original multimedia software |
 | [Debian FFmpeg source](https://tracker.debian.org/pkg/ffmpeg) | Source package definitions used by the build |
 
@@ -19,21 +20,21 @@ Ubuntu/Launchpad PPA source packaging for **FFmpeg 9**, maintained by AlexanderW
 1. Obtain the FFmpeg 9.x source package from the **signed Debian testing source repository** (only `deb-src`, not binary sources).
 2. Keep Debian's packaging and patches. Add a unique Ubuntu-series-specific changelog version.
 3. Produce a Debian/Ubuntu **source upload**, validate it by extracting the newly generated `.dsc`, check whether the target Ubuntu release can resolve its declared build dependencies, and store it as a GitHub Actions artifact.
-4. In a separate, protected workflow, check Launchpad for earlier uploads, sign the source package with a registered OpenPGP identity and submit it over SFTP.
-5. **Launchpad**, not GitHub, builds and hosts the final apt-installable amd64/arm64 packages.
+4. For **GitHub Pages**, compile native AMD64 and ARM64 binary packages on separate GitHub runners using Ubuntu 26.04 containers; test their installation in clean containers.
+5. In a credential-protected job, generate signed APT metadata for both architectures and publish the complete package repository to GitHub Pages.
+6. Alternatively, upload a signed source package through the **optional Launchpad PPA** workflow; Launchpad then handles its own binary builds.
 
-The two-job publication workflow keeps signing/SSH secrets away from the
-build process that executes upstream/Debian source scripts.
+The GitHub Pages workflow uses separate binary-build, signing and deployment jobs, keeping signing secrets away from the source compilation stage. The optional Launchpad workflow similarly isolates its GPG/SSH credentials.
 
 ## Ubuntu support
 
 | Ubuntu | Architecture target | Status |
 |---|---|---|
-| **26.04 LTS (resolute)** | amd64, arm64 | Source package and amd64 build-dependency resolution validated; Launchpad binaries pending |
+| **26.04 LTS (resolute)** | amd64, arm64 | GitHub Pages native binary builds configured; end-to-end checks pending |
 | 24.04 LTS (noble) | amd64, arm64 | Experimental; dependency backports may be needed |
 | 22.04 LTS (jammy) | amd64, arm64 | Experimental; dependency backports may be needed |
 
-Debian's `debhelper-compat (= 14)` requirement is adapted to level 13 for Resolute, where level 14 is unavailable. A full Launchpad binary build is still necessary to validate this backport.
+Debian's `debhelper-compat (= 14)` requirement is adapted to level 13 for Resolute, where level 14 is unavailable. A full native binary build is still necessary to validate this backport.
 
 The Launchpad PPA must have `arm64` enabled explicitly. Do not assume a source package validated on GitHub can be built against every Ubuntu release or architecture.
 
@@ -62,14 +63,21 @@ Artifacts are written to `dist/resolute/`. Remove `work/resolute/` and
 |---|---|
 | [CI](.github/workflows/ci.yml) | Python unit tests, ShellCheck, bash syntax |
 | [Build Ubuntu source package](.github/workflows/build-source.yml) | Builds and validates unsigned source packages on push/manual runs and weekly; stores artifacts |
-| [Publish to Launchpad PPA](.github/workflows/publish-ppa.yml) | Environment-protected SFTP source upload; manual or **opt-in** scheduled publishing |
+| [Publish FFmpeg APT via GitHub Pages](.github/workflows/pages-apt.yml) | Native AMD64 and ARM64 builds, installation smoke tests, signed APT indexes, Pages deployment |
+| [Publish to Launchpad PPA](.github/workflows/publish-ppa.yml) | Optional environment-protected SFTP source upload; manual or **opt-in** scheduled publishing |
 | [Dependabot](.github/dependabot.yml) | GitHub Actions dependency maintenance |
 
 All external GitHub Actions are pinned to commit hashes.
 
-**Publication is disabled by default** until the [Launchpad setup](docs/LAUNCHPAD.md) is complete. The `PPA_AUTO_PUBLISH` repository variable can enable optional weekly release checks after first successful manual publication and Ubuntu installation checks.
+**Both scheduled publishing paths are disabled by default.** First configure [GitHub Pages APT](docs/GITHUB-PAGES.md) and its dedicated key. Launchpad is a separate, optional [setup](docs/LAUNCHPAD.md). Only enable scheduled publishing after an end-to-end install passes.
 
-## Installation (only after the PPA builds successfully)
+## Install through GitHub Pages (after the first successful deployment)
+
+Use the public signing key from the deployed repository and a Deb822 `.sources` file. The full AMD64 and ARM64 instructions are in [GitHub Pages APT setup](docs/GITHUB-PAGES.md).
+
+The expected source URI is `https://alexanderwagnerdev.github.io/ffmpeg-ubuntu/` for Ubuntu 26.04 `resolute`. Verify the signing-key fingerprint independently before trusting a new repository.
+
+## Optional Launchpad installation (only after the PPA builds successfully)
 
 ```bash
 sudo add-apt-repository ppa:alexanderwagnerdev/ffmpeg

@@ -18,6 +18,12 @@ on:
       ppa:
         description: Whether the Launchpad PPA channel needs publication
         value: ${{ jobs.check.outputs.ppa }}
+      pages_check:
+        description: Result of the GitHub Pages update check
+        value: ${{ jobs.check.outputs.pages_check }}
+      ppa_check:
+        description: Result of the Launchpad PPA update check
+        value: ${{ jobs.check.outputs.ppa_check }}
 
 permissions:
   contents: read
@@ -29,6 +35,8 @@ jobs:
       build: ${{ steps.decide.outputs.build }}
       pages: ${{ steps.decide.outputs.pages }}
       ppa: ${{ steps.decide.outputs.ppa }}
+      pages_check: ${{ steps.decide.outputs.pages_check }}
+      ppa_check: ${{ steps.decide.outputs.ppa_check }}
     steps:
       - name: Ensure releases only run from main
         shell: bash
@@ -43,9 +51,11 @@ jobs:
           persist-credentials: false
       - name: Compare stable FFmpeg with GitHub Pages APT
         id: pages
+        continue-on-error: true
         run: python3 scripts/needs_release.py --channel pages
       - name: Compare stable FFmpeg with Launchpad PPA
         id: ppa
+        continue-on-error: true
         run: python3 scripts/needs_release.py --channel ppa
       - name: Decide which channels require publication
         id: decide
@@ -54,14 +64,26 @@ jobs:
           FORCE: ${{ inputs.force }}
           PAGES_UPDATE: ${{ steps.pages.outputs.update }}
           PPA_UPDATE: ${{ steps.ppa.outputs.update }}
-          STABLE_VERSION: ${{ steps.pages.outputs.version }}
+          PAGES_CHECK: ${{ steps.pages.outcome }}
+          PPA_CHECK: ${{ steps.ppa.outcome }}
+          STABLE_VERSION: ${{ steps.pages.outputs.version || steps.ppa.outputs.version }}
         run: |
           set -euo pipefail
-          pages="$PAGES_UPDATE"
-          ppa="$PPA_UPDATE"
-          if [[ "$FORCE" == 'true' ]]; then
-            pages=true
-            ppa=true
+          pages=false
+          ppa=false
+          if [[ "$PAGES_CHECK" == 'success' ]]; then
+            [[ "$PAGES_UPDATE" == 'true' || "$PAGES_UPDATE" == 'false' ]] || {
+              echo "::error::GitHub Pages check did not return an update decision"; exit 1;
+            }
+            pages="$PAGES_UPDATE"
+            if [[ "$FORCE" == 'true' ]]; then pages=true; fi
+          fi
+          if [[ "$PPA_CHECK" == 'success' ]]; then
+            [[ "$PPA_UPDATE" == 'true' || "$PPA_UPDATE" == 'false' ]] || {
+              echo "::error::Launchpad check did not return an update decision"; exit 1;
+            }
+            ppa="$PPA_UPDATE"
+            if [[ "$FORCE" == 'true' ]]; then ppa=true; fi
           fi
           build=false
           if [[ "$pages" == 'true' || "$ppa" == 'true' ]]; then
@@ -71,13 +93,20 @@ jobs:
             echo "build=$build"
             echo "pages=$pages"
             echo "ppa=$ppa"
+            echo "pages_check=$PAGES_CHECK"
+            echo "ppa_check=$PPA_CHECK"
           } >> "$GITHUB_OUTPUT"
           {
             echo "### FFmpeg release check"
             echo ""
-            echo "- Latest stable: $STABLE_VERSION"
+            echo "- Latest stable: ${STABLE_VERSION:-unavailable}"
             echo "- Build required: $build"
-            echo "- GitHub Pages publication: $pages"
-            echo "- Launchpad PPA publication: $ppa"
+            echo "- GitHub Pages check: $PAGES_CHECK (publish: $pages)"
+            echo "- Launchpad PPA check: $PPA_CHECK (publish: $ppa)"
             echo "- Forced: $FORCE"
+            if [[ "$PAGES_CHECK" != 'success' || "$PPA_CHECK" != 'success' ]]; then
+              echo ""
+              echo "**Warning:** A failed channel check is blocked from publishing;"
+              echo "the other channel may still proceed. Final pipeline health will fail."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"

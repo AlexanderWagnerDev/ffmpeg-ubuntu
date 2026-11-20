@@ -14,7 +14,7 @@ fi
 
 apt-get update -qq
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-  debian-archive-keyring devscripts debhelper dpkg-dev build-essential ca-certificates
+  debian-archive-keyring devscripts debhelper dpkg-dev build-essential ca-certificates curl gnupg patch
 test -s /usr/share/keyrings/debian-archive-keyring.gpg
 
 # Import only *source* package metadata, never binary Debian repositories.

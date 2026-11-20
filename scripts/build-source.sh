@@ -48,6 +48,10 @@ DEBIAN_UPSTREAM="${DEBIAN_VERSION#*:}"
 DEBIAN_UPSTREAM="${DEBIAN_UPSTREAM%-*}"
 UPSTREAM_RELEASE="$(python3 "$ROOT/scripts/latest_release.py")"
 echo "Debian testing: $DEBIAN_UPSTREAM; upstream stable: $UPSTREAM_RELEASE"
+if dpkg --compare-versions "$DEBIAN_UPSTREAM" gt "$UPSTREAM_RELEASE"; then
+  echo "Debian source is ahead of the latest official stable FFmpeg; refusing prerelease packaging" >&2
+  exit 1
+fi
 if dpkg --compare-versions "$UPSTREAM_RELEASE" gt "$DEBIAN_UPSTREAM"; then
   bash "$ROOT/scripts/prepare-upstream.sh" "$WORK" "$SOURCE_DIR" "$UPSTREAM_RELEASE"
   SOURCE_DIR="$WORK/ffmpeg-$UPSTREAM_RELEASE"

@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/build-source.sh'
+      - 'scripts/patch_ubuntu_control.py'
       - 'scripts/setup-build-env.sh'
       - 'scripts/package_version.py'
       - 'scripts/verify-source.sh'

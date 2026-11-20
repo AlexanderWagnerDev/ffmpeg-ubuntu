@@ -3,7 +3,11 @@ on:
   push:
     branches: [main]
     paths:
-      - 'scripts/**'
+      - 'scripts/build-source.sh'
+      - 'scripts/setup-build-env.sh'
+      - 'scripts/package_version.py'
+      - 'scripts/verify-source.sh'
+      - 'scripts/check-build-deps.sh'
       - '.github/workflows/build-source.yml'
   workflow_dispatch:
     inputs:

@@ -121,7 +121,7 @@ numbers if the same FFmpeg upstream version is repackaged with changes.
   backport patches. A passing source build or dependency simulation is not
   proof of an actual binary build.
 - This project uses native GitHub-hosted ARM64 runners
-  (`ubuntu-24.04-arm`) and native AMD64 runners, both with Ubuntu 26.04
+  (`ubuntu-26.04-arm`) and native AMD64 runners, both with Ubuntu 26.04
   build containers. Cross-emulation is **not** used.
 - Large FFmpeg binary-package sets can exceed the approximately 1 GB GitHub
   Pages deployment limit. The signing job refuses sites above 900 MiB.

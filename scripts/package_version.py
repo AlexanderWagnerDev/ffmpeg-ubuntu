@@ -4,7 +4,7 @@
 import argparse
 import re
 
-SERIES = {"jammy": "22.04", "noble": "24.04", "resolute": "26.04"}
+SERIES = {"noble": "24.04", "resolute": "26.04", "stonking": "26.10"}
 SOURCE_VERSION_RE = re.compile(r"^(?:(?P<epoch>[0-9]+):)?(?P<upstream>[0-9][A-Za-z0-9.+:~]*)-(?P<revision>[A-Za-z0-9.+~]+)$")
 
 

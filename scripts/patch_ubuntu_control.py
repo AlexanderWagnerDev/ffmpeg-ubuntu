@@ -47,7 +47,7 @@ def add_runtime_dependencies(control: str) -> str:
         last = pos - 1
         lines[last] = lines[last].rstrip("\n").rstrip().rstrip(",") + ",\n"
         extra = "".join(
-            f" {package} (= $${{binary:Version}}){',' if i + 1 < len(FFMPEG_RUNTIME) else ''}\n"
+            f" {package} (= ${{binary:Version}}){',' if i + 1 < len(FFMPEG_RUNTIME) else ''}\n"
             for i, package in enumerate(FFMPEG_RUNTIME)
         )
         lines.insert(pos, extra)

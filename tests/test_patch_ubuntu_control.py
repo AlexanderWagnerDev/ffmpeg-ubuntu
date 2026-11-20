@@ -27,7 +27,7 @@ class RuntimeDependsTests(unittest.TestCase):
     def test_all_version_matched_libraries_included(self):
         modified = add_runtime_dependencies(CONTROL)
         for package in FFMPEG_RUNTIME:
-            self.assertIn(f"{package} (= $${{binary:Version}})", modified)
+            self.assertIn(f"{package} (= ${{binary:Version}})", modified)
         self.assertIn("${shlibs:Depends}", modified)
         self.assertIn("${misc:Depends}", modified)
 

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Assemble a single GitHub Pages deployment containing both amd64 and arm64.
-# Runs only in the environment-protected signing job.
+# Runs in the standalone signing job, separate from binary compilation.
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 INPUT_DIR="${1:-}"
 [[ -n "$INPUT_DIR" && -d "$INPUT_DIR/amd64" && -d "$INPUT_DIR/arm64" ]] || {
@@ -12,7 +12,7 @@ for tool in dpkg-deb dpkg-scanpackages apt-ftparchive gpg gpgv gzip; do
   command -v "$tool" >/dev/null || { echo "Missing tool: $tool" >&2; exit 2; }
 done
 [[ -n "${PAGES_APT_GPG_PRIVATE_KEY_B64:-}" && -n "${PAGES_APT_GPG_FINGERPRINT:-}" ]] || {
-  echo "Missing protected APT signing environment secrets" >&2; exit 1;
+  echo "Missing GitHub repository APT signing secrets" >&2; exit 1;
 }
 SITE="$ROOT/site"
 [[ ! -e "$SITE" ]] || { echo "Site folder already exists" >&2; exit 1; }

@@ -32,8 +32,9 @@ if find "$OUT" -mindepth 1 -print -quit | grep -q .; then
 fi
 
 cd "$WORK"
-# This uses ONLY the Debian *source* index configured by setup-build-env.sh.
-# It does NOT add any Debian binary repositories to Ubuntu.
+# Start from the signed Debian source package and packaging files.
+# If upstream is newer, use the official FFmpeg-signed stable tarball.
+# Debian binary repositories are never added to Ubuntu.
 apt-get source ffmpeg
 
 mapfile -t source_dirs < <(find "$WORK" -maxdepth 1 -mindepth 1 -type d -name 'ffmpeg-*' | sort)

@@ -2,7 +2,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SERIES="${1:-resolute}"
-case "$SERIES" in jammy|noble|resolute) ;; *) echo "Unknown series: $SERIES" >&2; exit 2 ;; esac
+case "$SERIES" in noble|resolute|stonking) ;; *) echo "Unknown series: $SERIES" >&2; exit 2 ;; esac
 OUT="$ROOT/dist/$SERIES"
 shopt -s nullglob
 dsc=("$OUT"/ffmpeg_*.dsc)

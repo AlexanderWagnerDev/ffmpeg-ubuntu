@@ -25,7 +25,7 @@ jobs:
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'workflow_dispatch' || vars.PAGES_APT_AUTO_PUBLISH == 'true')
     name: Prepare one consistent FFmpeg 9 source package
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 45
     steps:
       - name: Check out source automation
@@ -107,7 +107,7 @@ jobs:
   sign:
     needs: build
     name: Sign AMD64 and ARM64 APT indexes
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     environment: apt-pages-signing
     steps:
@@ -144,7 +144,7 @@ jobs:
   deploy:
     needs: sign
     name: Deploy repository on GitHub Pages
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     environment:
       name: github-pages

@@ -33,7 +33,7 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'workflow_dispatch' || vars.PPA_AUTO_PUBLISH == 'true')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 45
     outputs:
       series: ${{ steps.config.outputs.series }}
@@ -81,7 +81,7 @@ jobs:
   publish:
     needs: prepare
     # Upstream Debian scripts do not run in this credential-bearing job.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 25
     environment: launchpad-ppa
     steps:

@@ -7,11 +7,11 @@ import re
 from urllib.request import Request, urlopen
 
 INDEX_URL = "https://ffmpeg.org/releases/"
-RELEASE_NAME = re.compile(r"^ffmpeg-([0-9]+(?:\\.[0-9]+)+)\\.tar\\.xz$")
+RELEASE_NAME = re.compile(r"^ffmpeg-([0-9]+(?:\.[0-9]+)+)\.tar\.xz$")
 
 
 def version_tuple(version: str) -> tuple[int, ...]:
-    if not re.fullmatch(r"[0-9]+(?:\\.[0-9]+)+", version):
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+)+", version):
         raise ValueError(f"Invalid stable version: {version!r}")
     return tuple(map(int, version.split(".")))
 

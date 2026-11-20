@@ -69,6 +69,17 @@ elif ! grep -Fq 'debhelper-compat (= 13)' "$SOURCE_DIR/debian/control"; then
   exit 1
 fi
 python3 "$ROOT/scripts/patch_ubuntu_control.py" "$SOURCE_DIR/debian/control"
+# Ubuntu 24.04 ships libplacebo 6; FFmpeg 9.1+ needs libplacebo >= 7.351.
+# This integration is optional: disable only that feature on Noble.
+if [[ "$SERIES" == noble ]]; then
+  if grep -Fq -- '--enable-libplacebo' "$SOURCE_DIR/debian/rules"; then
+    sed -i 's/--enable-libplacebo/--disable-libplacebo/g' "$SOURCE_DIR/debian/rules"
+    echo "Disabled libplacebo integration for Ubuntu 24.04 (older library ABI)"
+  else
+    echo "No explicit libplacebo build option found; verify Noble compatibility" >&2
+    exit 1
+  fi
+fi
 export DEBFULLNAME="Alexander Wagner"
 export DEBEMAIL="info@alexanderwagnerdev.com"
 cd "$SOURCE_DIR"

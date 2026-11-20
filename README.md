@@ -21,7 +21,7 @@ Ubuntu source and binary packaging for **FFmpeg 9**, with two independent distri
 2. Keep Debian's packaging and patches. Add a unique Ubuntu-series-specific changelog version.
 3. Produce a Debian/Ubuntu **source upload**, validate it by extracting the newly generated `.dsc`, check whether the target Ubuntu release can resolve its declared build dependencies, and store it as a GitHub Actions artifact.
 4. For **GitHub Pages**, compile native AMD64 and ARM64 binary packages on separate GitHub runners using Ubuntu 26.04 containers; test their installation in clean containers.
-5. In a credential-protected job, generate signed APT metadata for both architectures and publish the complete package repository to GitHub Pages.
+5. In a separate signing job using repository secrets, generate signed APT metadata for both architectures and publish the complete package repository to GitHub Pages.
 6. Alternatively, upload a signed source package through the **optional Launchpad PPA** workflow; Launchpad then handles its own binary builds.
 
 The GitHub Pages workflow uses separate binary-build, signing and deployment jobs, keeping signing secrets away from the source compilation stage. The optional Launchpad workflow similarly isolates its OpenPGP signing credentials and uploads with `dput ppa:…` (no SSH key required).
@@ -69,7 +69,7 @@ Artifacts are written to `dist/resolute/`. Remove `work/resolute/` and
 
 All external GitHub Actions are pinned to commit hashes.
 
-**Both scheduled publishing paths are disabled by default.** First configure [GitHub Pages APT](docs/GITHUB-PAGES.md) and its dedicated key. Launchpad is a separate, optional [setup](docs/LAUNCHPAD.md), requiring only two dedicated OpenPGP environment secrets. Only enable scheduled publishing after an end-to-end install passes.
+**Both scheduled publishing paths are disabled by default.** First configure [GitHub Pages APT](docs/GITHUB-PAGES.md) and its dedicated key. Launchpad is a separate, optional [setup](docs/LAUNCHPAD.md), requiring only two dedicated OpenPGP repository secrets. Only enable scheduled publishing after an end-to-end install passes.
 
 ## Install through GitHub Pages (after the first successful deployment)
 

@@ -109,7 +109,6 @@ jobs:
     name: Sign AMD64 and ARM64 APT indexes
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment: apt-pages-signing
     steps:
       - name: Check out only repository signing scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

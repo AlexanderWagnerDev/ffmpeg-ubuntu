@@ -83,7 +83,6 @@ jobs:
     # Upstream Debian scripts do not run in this credential-bearing job.
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    environment: launchpad-ppa
     steps:
       - name: Check out publication scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -125,7 +124,7 @@ jobs:
         run: |
           set -euo pipefail
           for var in PPA_GPG_PRIVATE_KEY_B64 PPA_GPG_FINGERPRINT; do
-            [[ -n "${!var}" ]] || { echo "::error::Missing Launchpad environment secret: $var"; exit 1; }
+            [[ -n "${!var}" ]] || { echo "::error::Missing GitHub repository secret: $var"; exit 1; }
           done
 
       - name: Sign and upload source to Launchpad PPA

@@ -26,9 +26,7 @@ Launchpad builds final binary packages after accepting the source.
    generate a dedicated key and upload its public portion to the Ubuntu
    keyserver, then import its fingerprint in Launchpad's OpenPGP key settings.
    Do not register a GitHub SSH key; this workflow does not use SSH.
-3. In [GitHub Environments](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/settings/environments),
-   create an Environment named **`launchpad-ppa`** and add only these two
-   **Environment secrets**:
+3. Open [GitHub Settings → Secrets and variables → Actions](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/settings/secrets/actions) and add these two **repository secrets** (no Environment required):
 
    | Secret | Content |
    |---|---|
@@ -53,7 +51,7 @@ Launchpad builds final binary packages after accepting the source.
 4. Run [Publish to Launchpad PPA](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/publish-ppa.yml)
    on `main` using `series=resolute` and `revision=1`.
    The source package is built and validated in an unprivileged job; a
-   separate Environment-gated job imports the GPG key, runs `debsign`, then
+   separate publishing job imports the GPG key, runs `debsign`, then
    `dput ppa:alexanderwagnerdev/ffmpeg`.
 
 ## After upload
@@ -92,3 +90,5 @@ key for signing APT repository metadata.
 
 - [Ubuntu Launchpad PPA upload documentation](https://ubuntu.com/docs/launchpad/user/how-to/packaging/ppa-package-upload/)
 - [OpenRTMP's existing PPA workflow](https://github.com/OpenRTMP/librtmp2/blob/main/.github/workflows/publish-ppa.yml)
+
+The two PPA signing secrets are read only by the publishing job. The source-building job receives no signing key. If you previously stored the keys as **Environment secrets**, enter them again as **Repository secrets** because GitHub does not let you reveal or automatically copy secret values.

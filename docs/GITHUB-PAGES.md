@@ -18,9 +18,7 @@ The repository must include:
 
 1. Open [Settings → Pages](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/settings/pages)
    and set **Build and deployment → Source: GitHub Actions**.
-2. Open [Settings → Environments](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/settings/environments)
-   and create an Environment named **`apt-pages-signing`**.
-   Where supported, enable required reviewers for signing releases.
+2. Open [Settings → Secrets and variables → Actions](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/settings/secrets/actions). No extra signing Environment is required.
 3. On a trusted Linux machine, create a **dedicated APT signing key** (not your
    normal personal Git or Launchpad signing key). For unattended CI signing,
    this example creates a key with no interactive passphrase:
@@ -36,7 +34,7 @@ The repository must include:
 
    Copy the newly generated fingerprint from the `fpr` line. Keep a safe
    offline backup and never post private key content in chats, issues, or Git.
-4. Add **two Environment secrets** to `apt-pages-signing`:
+4. Add these two **repository secrets**:
 
    | Secret | Value |
    |---|---|
@@ -135,3 +133,7 @@ References:
 - [GitHub Pages workflow configuration](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
 - [GitHub-hosted ARM64 runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
 - [GitHub Pages limits](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits)
+
+> The workflow intentionally separates compiling FFmpeg from the signing job; only the latter reads the secret values. The normal **`github-pages`** Environment in the deployment job stays, because GitHub Pages uses it to associate deployments with the Pages site. It is not where you need to store the signing secrets.
+
+If the signing secrets were previously stored only under `apt-pages-signing`, re-add them as repository secrets. GitHub does not expose existing secret values for copying.

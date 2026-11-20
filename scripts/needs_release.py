@@ -17,10 +17,28 @@ def upstream_from_debian_version(value: str) -> str | None:
     return match.group(1) if match else None
 
 
-def publication_needs_update(latest: str, published_versions: list[str]) -> bool:
-    versions = [upstream_from_debian_version(v) for v in published_versions]
-    known = [v for v in versions if v]
-    return not known or max(map(version_tuple, known)) < version_tuple(latest)
+def publication_needs_update(
+    latest: str, published_versions: list[str], series: str | None = None
+) -> bool:
+    versions = [(v, upstream_from_debian_version(v)) for v in published_versions]
+    known = [(v, upstream) for v, upstream in versions if upstream]
+    if not known:
+        return True
+    newest_upstream = max(version_tuple(upstream) for _, upstream in known)
+    if newest_upstream < version_tuple(latest):
+        return True
+    if newest_upstream > version_tuple(latest) or series is None:
+        return False
+
+    # Migrate already-published releases from +ubuntuXX.XX~ppaN to
+    # .N~codename automatically, even if the upstream FFmpeg version is unchanged.
+    if series not in SERIES:
+        raise ValueError(f"Unsupported Ubuntu release: {series}")
+    suffix = re.compile(rf"\\.[1-9][0-9]*~{re.escape(series)}$")
+    return not any(
+        upstream == latest and suffix.search(version)
+        for version, upstream in known
+    )
 
 
 SERIES = ("noble", "resolute", "stonking")
@@ -66,7 +84,7 @@ def main() -> None:
             versions = fetch_versions("alexanderwagnerdev", "ffmpeg", series)
         else:
             versions = get_pages_versions(series)
-        changed = publication_needs_update(latest, versions)
+        changed = publication_needs_update(latest, versions, series)
         needed |= changed
         print(f"{args.channel}/{series}: {versions or 'none'}; stable {latest}: {changed}")
     print(f"Missing suite or newer stable FFmpeg release: {needed}")

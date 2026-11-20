@@ -34,14 +34,27 @@ def add_runtime_dependencies(control: str) -> str:
             i for i, line in enumerate(lines)
             if line.startswith("Depends:")
         ]
-        if len(dep_positions) != 1:
-            raise ValueError("Expected exactly one Depends field for ffmpeg")
+        if len(dep_positions) > 1:
+            raise ValueError("Multiple Depends fields for ffmpeg")
+        if not dep_positions:
+            # Debian's current FFmpeg package stanza has no explicit Depends
+            # field, so the Ubuntu rebuild generated a broken standalone CLI.
+            # Create the field rather than assuming dh_shlibdeps will do it.
+            package_pos = next(
+                (i for i, line in enumerate(lines) if line.startswith("Package: ffmpeg")),
+                None,
+            )
+            if package_pos is None:
+                raise ValueError("Missing ffmpeg package field")
+            pos = package_pos + 1
+            while pos < len(lines) and lines[pos][:1] in (" ", "\t"):
+                pos += 1
+            lines.insert(pos, "Depends: ${shlibs:Depends}, ${misc:Depends},\n")
+            dep_positions = [pos]
         pos = dep_positions[0] + 1
         while pos < len(lines) and lines[pos][:1] in (" ", "\t"):
             pos += 1
         original = "".join(lines[dep_positions[0]:pos])
-        if "${shlibs:Depends}" not in original:
-            raise ValueError("FFmpeg Depends field has unexpectedly changed")
         if "libavdevice63 (= ${binary:Version})" in original:
             continue
         last = pos - 1

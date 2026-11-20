@@ -97,6 +97,14 @@ The Ubuntu rebuilds use short, codename-tagged Debian versions without the old `
 
 Revision `2` gives `-6.2~resolute`, and so on. The package version includes Debian's epoch and packaging revision; it is intentionally not just the upstream FFmpeg version. Debian's version comparator confirms the new `-6.1~resolute` revision is higher than the previous `-6+ubuntu26.04~ppa1` package, preserving upgrades for existing installations. The central daily check triggers a one-time republish when only the old suffix exists for the latest upstream release; subsequent checks skip once a matching current-scheme version is published. Rebuilding a *previously published* package still requires a new revision.
 
+### Publication safeguards
+
+The GitHub Pages and Launchpad version checks run **independently**. If either service is unreachable, its own publishing channel is blocked while the other can still build and publish. The overall pipeline reports the failed check as an error instead of silently reporting success.
+
+Before deployment, the Pages publisher compares the candidate `ffmpeg` Debian package version against the **live APT index** for all six supported Ubuntu/architecture targets using `dpkg --compare-versions`. If even one candidate is older than the public version, the complete Pages deployment is skipped; the Launchpad PPA upload can proceed independently.
+
+For Launchpad, `Deleted` and `Obsolete` source records do **not** count as current published releases. The duplicate-upload guard still accounts for historical uploaded versions, including `Superseded`, because Launchpad may reject a reused version number. If a previously uploaded package was removed, publish a new package revision instead of reusing its exact version.
+
 ### Release changelog
 
 Every Ubuntu source package now includes the **official FFmpeg release notes** for its exact upstream version in `debian/changelog`, in addition to the Ubuntu packaging/rebuild entry. The notes are read directly from the source tree's upstream `Changelog` (the official signed FFmpeg tarball when updated, or the signed Debian source when already current), not a separately scraped web summary. The PPA package's **Changelog** shows the release-specific features and fixes for each Ubuntu version, rather than just a generic rebuild line. If the exact release section cannot be found, the build fails rather than publishing misleading notes.

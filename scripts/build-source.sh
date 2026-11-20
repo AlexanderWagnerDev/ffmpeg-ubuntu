@@ -43,10 +43,20 @@ if [[ "${#source_dirs[@]}" -ne 1 ]]; then
 fi
 SOURCE_DIR="${source_dirs[0]}"
 DEBIAN_VERSION="$(dpkg-parsechangelog --file "$SOURCE_DIR/debian/changelog" --show-field Version)"
+DEBIAN_EPOCH="${DEBIAN_VERSION%%:*}"
+DEBIAN_UPSTREAM="${DEBIAN_VERSION#*:}"
+DEBIAN_UPSTREAM="${DEBIAN_UPSTREAM%-*}"
+UPSTREAM_RELEASE="$(python3 "$ROOT/scripts/latest_release.py")"
+echo "Debian testing: $DEBIAN_UPSTREAM; upstream stable: $UPSTREAM_RELEASE"
+if dpkg --compare-versions "$UPSTREAM_RELEASE" gt "$DEBIAN_UPSTREAM"; then
+  bash "$ROOT/scripts/prepare-upstream.sh" "$WORK" "$SOURCE_DIR" "$UPSTREAM_RELEASE"
+  SOURCE_DIR="$WORK/ffmpeg-$UPSTREAM_RELEASE"
+  # A revision of 0 keeps a later official Debian package revision newer.
+  DEBIAN_VERSION="$DEBIAN_EPOCH:$UPSTREAM_RELEASE-0"
+fi
 NEW_VERSION="$(python3 "$ROOT/scripts/package_version.py" "$DEBIAN_VERSION" "$SERIES" "$REVISION")"
-# Debian testing currently requires debhelper 14, which is not in the
-# Ubuntu 26.04 archive. Downgrade the packaging compatibility level only for
-# resolute; keep this scoped and verify the full binary build on Launchpad.
+# Debian testing may require newer debhelper than Ubuntu 26.04 provides.
+# Apply the limited Ubuntu compatibility patch and validate by full builds.
 if [[ "$SERIES" == "resolute" ]]; then
   if grep -Fq 'debhelper-compat (= 14)' "$SOURCE_DIR/debian/control"; then
     sed -i 's/debhelper-compat (= 14)/debhelper-compat (= 13)/g' "$SOURCE_DIR/debian/control"
@@ -61,7 +71,7 @@ export DEBFULLNAME="Alexander Wagner"
 export DEBEMAIL="info@alexanderwagnerdev.com"
 cd "$SOURCE_DIR"
 dch --newversion "$NEW_VERSION" --distribution "$SERIES" --force-distribution \
-  "Rebuild Debian FFmpeg 9 source for Ubuntu $SERIES (PPA revision $REVISION)."
+  "Rebuild stable FFmpeg $UPSTREAM_RELEASE for Ubuntu $SERIES (revision $REVISION)."
 # -d skips build-dependency checks for SOURCE generation only.
 # Binary builds and runtime dependency tests run separately (Pages or Launchpad).
 dpkg-buildpackage -S -sa -us -uc -d

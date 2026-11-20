@@ -20,10 +20,41 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  prepare-source:
     if: >-
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'workflow_dispatch' || vars.PAGES_APT_AUTO_PUBLISH == 'true')
+    name: Prepare one consistent FFmpeg 9 source package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out source automation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate package revision
+        env:
+          REVISION: ${{ inputs.revision || '1' }}
+        run: |
+          [[ "$REVISION" =~ ^[1-9][0-9]*$ ]] || exit 2
+      - name: Configure signed Debian source index
+        run: sudo bash scripts/setup-build-env.sh
+      - name: Assemble and validate Ubuntu FFmpeg 9 source
+        env:
+          REVISION: ${{ inputs.revision || '1' }}
+        run: |
+          bash scripts/build-source.sh resolute "$REVISION"
+          bash scripts/verify-source.sh resolute
+      - name: Share one source with both native-architecture builds
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ffmpeg-resolute-source
+          path: dist/resolute/
+          if-no-files-found: error
+          retention-days: 3
+
+  build:
+    needs: prepare-source
     name: Build FFmpeg for ${{ matrix.arch }}
     strategy:
       fail-fast: false
@@ -40,27 +71,23 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Validate package revision and native architecture
-        shell: bash
+      - name: Verify native build architecture
         env:
-          REVISION: ${{ inputs.revision || '1' }}
           ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
-          [[ "$REVISION" =~ ^[1-9][0-9]*$ ]] || exit 2
           if [[ "$ARCH" == amd64 ]]; then
             test "$(uname -m)" = x86_64
           else
             test "$(uname -m)" = aarch64
           fi
           docker info >/dev/null
-      - name: Configure signed Debian source index
-        run: sudo bash scripts/setup-build-env.sh
-      - name: Generate Ubuntu 26.04 FFmpeg 9 source
-        env:
-          REVISION: ${{ inputs.revision || '1' }}
-        run: bash scripts/build-source.sh resolute "$REVISION"
-      - name: Verify source and Ubuntu build dependencies
+      - name: Download the same validated source package for both architectures
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ffmpeg-resolute-source
+          path: dist/resolute
+      - name: Check source archive and native build dependencies
         run: |
           bash scripts/verify-source.sh resolute
           bash scripts/check-build-deps.sh resolute

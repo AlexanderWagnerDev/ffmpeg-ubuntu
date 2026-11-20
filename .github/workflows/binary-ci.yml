@@ -1,0 +1,46 @@
+name: Validate FFmpeg native binary builds
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/build-binaries.sh'
+      - 'scripts/test-binaries.sh'
+      - 'scripts/build-source.sh'
+      - 'scripts/check-build-deps.sh'
+      - 'scripts/setup-build-env.sh'
+      - 'scripts/package_version.py'
+      - '.github/workflows/binary-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  binary-build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 300
+    steps:
+      - name: Checkout source automation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Configure Debian source-only package index
+        run: sudo bash scripts/setup-build-env.sh
+      - name: Assemble Ubuntu 26.04 source
+        run: bash scripts/build-source.sh resolute 1
+      - name: Verify Ubuntu source archive
+        run: bash scripts/verify-source.sh resolute
+      - name: Check package build dependencies
+        run: bash scripts/check-build-deps.sh resolute
+      - name: Compile native FFmpeg packages
+        run: bash scripts/build-binaries.sh resolute ${{ matrix.arch }}
+      - name: Install and smoke-test FFmpeg
+        run: bash scripts/test-binaries.sh resolute ${{ matrix.arch }}

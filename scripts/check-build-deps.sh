@@ -6,10 +6,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SERIES="${1:-}"
 case "$SERIES" in
-  jammy) RELEASE=22.04 ;;
   noble) RELEASE=24.04 ;;
   resolute) RELEASE=26.04 ;;
-  *) echo "Usage: $0 jammy|noble|resolute" >&2; exit 2 ;;
+  stonking) RELEASE=26.10 ;;
+  *) echo "Usage: $0 noble|resolute|stonking" >&2; exit 2 ;;
 esac
 command -v docker >/dev/null || { echo "Docker is required" >&2; exit 2; }
 SOURCE_DIR="$ROOT/dist/$SERIES"

@@ -34,7 +34,7 @@ def publication_needs_update(
     # .N~codename automatically, even if the upstream FFmpeg version is unchanged.
     if series not in SERIES:
         raise ValueError(f"Unsupported Ubuntu release: {series}")
-    suffix = re.compile(rf"\\.[1-9][0-9]*~{re.escape(series)}$")
+    suffix = re.compile(rf"\.[1-9][0-9]*~{re.escape(series)}$")
     return not any(
         upstream == latest and suffix.search(version)
         for version, upstream in known

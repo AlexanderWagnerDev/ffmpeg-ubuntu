@@ -55,7 +55,7 @@ def add_runtime_dependencies(control: str, packages: tuple[str, ...] = FFMPEG_RU
         while pos < len(lines) and lines[pos][:1] in (" ", "\t"):
             pos += 1
         original = "".join(lines[dep_positions[0]:pos])
-        if f"{packages[1]} (= ${binary:Version})" in original:
+        if f"{packages[1]} (= ${{binary:Version}})" in original:
             continue
         last = pos - 1
         lines[last] = lines[last].rstrip("\n").rstrip().rstrip(",") + ",\n"

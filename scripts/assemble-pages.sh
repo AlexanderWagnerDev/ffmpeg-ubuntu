@@ -106,6 +106,11 @@ cat > index.html <<'HTML'
 </html>
 HTML
 
+# APT verifies signatures as the unprivileged _apt user. In particular,
+# signing keys and release metadata must be world-readable on the Pages site.
+find "$SITE" -type d -exec chmod 0755 {} +
+find "$SITE" -type f -exec chmod 0644 {} +
+
 bytes="$(du -sb "$SITE" | cut -f1)"
 if (( bytes > 900 * 1024 * 1024 )); then
   echo "Pages APT site too large: $bytes bytes (>900 MiB), use external hosting" >&2

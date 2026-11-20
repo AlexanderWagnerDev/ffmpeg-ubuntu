@@ -85,6 +85,14 @@ export DEBEMAIL="info@alexanderwagnerdev.com"
 cd "$SOURCE_DIR"
 dch --newversion "$NEW_VERSION" --distribution "$SERIES" --force-distribution \
   "Rebuild stable FFmpeg $UPSTREAM_RELEASE for Ubuntu $SERIES (revision $REVISION)."
+# The source tree's upstream Changelog comes from the verified upstream tarball
+# or signed Debian source. Include the exact release's own notes in the PPA UI.
+python3 "$ROOT/scripts/ffmpeg_changelog.py" \
+  --upstream "$SOURCE_DIR/Changelog" \
+  --version "$UPSTREAM_RELEASE" \
+  --debian "$SOURCE_DIR/debian/changelog"
+# Verify the new Debian stanza is well-formed before creating a source package.
+dpkg-parsechangelog --file "$SOURCE_DIR/debian/changelog" >/dev/null
 # -d skips build-dependency checks for SOURCE generation only.
 # Binary builds and runtime dependency tests run separately (Pages or Launchpad).
 dpkg-buildpackage -S -sa -us -uc -d

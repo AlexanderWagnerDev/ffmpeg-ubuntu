@@ -1,11 +1,13 @@
 """Regression tests for Ubuntu FFmpeg runtime package relationships."""
 
 import sys
+import tempfile
 from pathlib import Path
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from patch_ubuntu_control import add_runtime_dependencies, FFMPEG_RUNTIME
+from patch_ubuntu_control import (add_runtime_dependencies, FFMPEG_RUNTIME,
+                                  current_runtime_packages, sync_abi_metadata)
 
 
 CONTROL = """Source: ffmpeg
@@ -49,6 +51,32 @@ class RuntimeDependsTests(unittest.TestCase):
             "Depends: ${shlibs:Depends}, ${misc:Depends}",
             result,
         )
+
+    def test_future_major_abi_package_names(self):
+        target = (64, 64, 13, 64, 62, 8, 11)
+        with tempfile.TemporaryDirectory() as root:
+            base = Path(root)
+            debian = base / "debian"
+            debian.mkdir()
+            control_file = debian / "control"
+            control_file.write_text(CONTROL)
+            (debian / "libavcodec63.install").write_text(
+                "usr/lib/*/libavcodec.so.63*\\n"
+            )
+            for old, major in zip(FFMPEG_RUNTIME, target):
+                prefix = old.rstrip("0123456789")
+                parent = base / prefix
+                parent.mkdir()
+                (parent / "version_major.h").write_text(
+                    f"#define {prefix.upper()}_VERSION_MAJOR {major}\\n"
+                )
+            packages = current_runtime_packages(base)
+            sync_abi_metadata(debian, packages)
+            metadata = add_runtime_dependencies(control_file.read_text(), packages)
+            self.assertIn("libavcodec64 (= ${binary:Version})", metadata)
+            self.assertIn("libavdevice64 (= ${binary:Version})", metadata)
+            self.assertIn("Package: libavdevice64", metadata)
+            self.assertTrue((debian / "libavcodec64.install").exists())
 
     def test_missing_binary_fails(self):
         with self.assertRaises(ValueError):

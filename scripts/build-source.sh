@@ -51,6 +51,7 @@ if [[ "$SERIES" == "resolute" ]]; then
   if grep -Fq 'debhelper-compat (= 14)' "$SOURCE_DIR/debian/control"; then
     sed -i 's/debhelper-compat (= 14)/debhelper-compat (= 13)/g' "$SOURCE_DIR/debian/control"
     echo "Using Ubuntu-compatible debhelper level 13"
+    python3 "$ROOT/scripts/patch_ubuntu_control.py" "$SOURCE_DIR/debian/control"
   else
     echo "Debian debhelper requirement changed; recheck Ubuntu compatibility" >&2
     exit 1

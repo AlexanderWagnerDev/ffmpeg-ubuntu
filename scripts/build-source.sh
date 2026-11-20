@@ -79,6 +79,10 @@ if [[ "$SERIES" == noble ]]; then
     echo "No explicit libplacebo build option found; verify Noble compatibility" >&2
     exit 1
   fi
+  # Noble ships Vulkan 1.3.275 (< FFmpeg's minimum 1.3.277), so only two
+  # Vulkan-specific symbols must be optional. Keep all other ABI checks active.
+  # Skip Noble's incompatible dwz, retaining debug symbols.
+  python3 "$ROOT/scripts/patch_noble_compat.py" "$SOURCE_DIR/debian"
 fi
 export DEBFULLNAME="Alexander Wagner"
 export DEBEMAIL="info@alexanderwagnerdev.com"

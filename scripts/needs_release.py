@@ -23,10 +23,15 @@ def publication_needs_update(latest: str, published_versions: list[str]) -> bool
     return not known or max(map(version_tuple, known)) < version_tuple(latest)
 
 
-def get_pages_versions() -> list[str]:
+SERIES = ("noble", "resolute", "stonking")
+
+
+def get_pages_versions(series: str) -> list[str]:
+    if series not in SERIES:
+        raise ValueError(f"Unsupported Ubuntu release: {series}")
     url = (
         "https://alexanderwagnerdev.github.io/ffmpeg-ubuntu/"
-        "dists/resolute/main/binary-amd64/Packages.gz"
+        f"dists/{series}/main/binary-amd64/Packages.gz"
     )
     request = Request(url, headers={"User-Agent": "ffmpeg-ubuntu-updates/1.0"})
     try:
@@ -55,13 +60,16 @@ def main() -> None:
     args = parser.parse_args()
 
     latest = latest_release()
-    if args.channel == "ppa":
-        versions = fetch_versions("alexanderwagnerdev", "ffmpeg", "resolute")
-    else:
-        versions = get_pages_versions()
-    needed = publication_needs_update(latest, versions)
-    print(f"Latest stable FFmpeg: {latest}; published {args.channel}: {versions or 'none'}")
-    print(f"New stable version available for {args.channel}: {needed}")
+    needed = False
+    for series in SERIES:
+        if args.channel == "ppa":
+            versions = fetch_versions("alexanderwagnerdev", "ffmpeg", series)
+        else:
+            versions = get_pages_versions(series)
+        changed = publication_needs_update(latest, versions)
+        needed |= changed
+        print(f"{args.channel}/{series}: {versions or 'none'}; stable {latest}: {changed}")
+    print(f"Missing suite or newer stable FFmpeg release: {needed}")
 
     output = os.environ.get("GITHUB_OUTPUT")
     if output:

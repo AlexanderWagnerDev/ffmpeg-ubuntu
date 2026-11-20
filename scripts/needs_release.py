@@ -44,12 +44,14 @@ def publication_needs_update(
 SERIES = ("noble", "resolute", "stonking")
 
 
-def get_pages_versions(series: str) -> list[str]:
+def get_pages_versions(series: str, arch: str = "amd64") -> list[str]:
     if series not in SERIES:
         raise ValueError(f"Unsupported Ubuntu release: {series}")
+    if arch not in ("amd64", "arm64"):
+        raise ValueError(f"Unsupported APT architecture: {arch}")
     url = (
         "https://alexanderwagnerdev.github.io/ffmpeg-ubuntu/"
-        f"dists/{series}/main/binary-amd64/Packages.gz"
+        f"dists/{series}/main/binary-{arch}/Packages.gz"
     )
     request = Request(url, headers={"User-Agent": "ffmpeg-ubuntu-updates/1.0"})
     try:

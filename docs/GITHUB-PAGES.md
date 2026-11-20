@@ -55,7 +55,7 @@ The repository must include:
    Both AMD64 and ARM64 builds must pass before signing or deployment begins.
 6. Verify that both package indexes and the detached public key are served by
    the live URL. Compare the downloaded public key's fingerprint against the
-   fingerprint saved in the protected GitHub Environment.
+   fingerprint recorded on your trusted machine when creating the signing key; GitHub does not let you reveal saved secret values.
 
 ## Installing on Ubuntu 26.04 LTS
 

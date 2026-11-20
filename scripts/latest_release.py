@@ -38,14 +38,18 @@ def select_latest_release(html: str, minimum_major: int = 9) -> str:
     return max(valid, key=lambda v: version_tuple(v) + (0,) * 8)
 
 
+def latest_release(minimum_major: int = 9) -> str:
+    request = Request(INDEX_URL, headers={"User-Agent": "ffmpeg-ubuntu/1.0"})
+    with urlopen(request, timeout=30) as response:
+        html = response.read(4_000_000).decode("utf-8")
+    return select_latest_release(html, minimum_major)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--minimum-major", type=int, default=9)
     args = parser.parse_args()
-    request = Request(INDEX_URL, headers={"User-Agent": "ffmpeg-ubuntu/1.0"})
-    with urlopen(request, timeout=30) as response:
-        html = response.read(4_000_000).decode("utf-8")
-    print(select_latest_release(html, args.minimum_major))
+    print(latest_release(args.minimum_major))
 
 
 if __name__ == "__main__":

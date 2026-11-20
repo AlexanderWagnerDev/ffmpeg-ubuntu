@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate deterministic Ubuntu PPA versions from Debian source versions."""
+"""Generate compact, upgrade-safe Ubuntu FFmpeg package versions."""
 
 import argparse
 import re
@@ -19,7 +19,10 @@ def ubuntu_version(debian_version: str, series: str, revision: int) -> str:
     upstream = match.group("upstream")
     if int(upstream.split(".", 1)[0]) < 9:
         raise ValueError(f"Unsupported FFmpeg release: {upstream}")
-    return f"{debian_version}+ubuntu{SERIES[series]}~ppa{revision}"
+    # Keep the Ubuntu series visible without the verbose +ubuntuXX.XX~ppaN.
+    # A numeric packaging revision sorts above the previous +ubuntu... scheme
+    # and below the next upstream Debian packaging revision.
+    return f"{debian_version}.{revision}~{series}"
 
 
 def main() -> None:

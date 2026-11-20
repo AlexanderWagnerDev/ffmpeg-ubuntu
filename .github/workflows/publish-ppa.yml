@@ -4,21 +4,21 @@ on:
   workflow_dispatch:
     inputs:
       series:
-        description: Ubuntu series (only resolute is currently validated)
+        description: Ubuntu release (all by default)
         type: choice
         required: true
-        default: resolute
+        default: all
         options:
-          - resolute
+          - all
           - noble
-          - jammy
+          - resolute
+          - stonking
       revision:
-        description: Increment after a failed or previously accepted upload
+        description: Package revision (increase for rebuilt upstream versions)
         type: string
         required: true
         default: '1'
   schedule:
-    # Daily upstream stable check; skip when already published.
     - cron: '31 5 * * *'
 
 permissions:
@@ -30,97 +30,97 @@ concurrency:
 
 jobs:
   check-upstream:
-    name: Check for a new stable FFmpeg release
+    name: Check stable FFmpeg and select Ubuntu releases
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     outputs:
-      update: ${{ steps.compare.outputs.update }}
-      version: ${{ steps.compare.outputs.version }}
+      update: ${{ steps.select.outputs.update }}
+      series: ${{ steps.select.outputs.series }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Compare upstream and Launchpad PPA versions
-        id: compare
-        if: github.event_name == 'schedule'
-        run: python3 scripts/needs_release.py --channel ppa
+      - name: Select supported Ubuntu releases
+        id: select
+        shell: bash
+        env:
+          REQUESTED_SERIES: ${{ inputs.series || 'all' }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == schedule ]]; then
+            python3 scripts/needs_release.py --channel ppa
+          else
+            echo 'update=true' >> "$GITHUB_OUTPUT"
+          fi
+          case "$REQUESTED_SERIES" in
+            all) echo 'series=["noble","resolute","stonking"]' >> "$GITHUB_OUTPUT" ;;
+            noble|resolute|stonking) echo "series=[\"$REQUESTED_SERIES\"]" >> "$GITHUB_OUTPUT" ;;
+            *) echo "Unsupported Ubuntu release" >&2; exit 2 ;;
+          esac
 
   prepare:
     needs: check-upstream
-    if: >-
-      github.ref == 'refs/heads/main' &&
-      (github.event_name == 'workflow_dispatch' || needs.check-upstream.outputs.update == 'true')
+    if: needs.check-upstream.outputs.update == 'true' && github.ref == 'refs/heads/main'
+    name: Prepare ${{ matrix.series }} source
+    strategy:
+      fail-fast: false
+      matrix:
+        series: ${{ fromJSON(needs.check-upstream.outputs.series) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    outputs:
-      series: ${{ steps.config.outputs.series }}
-      revision: ${{ steps.config.outputs.revision }}
+    timeout-minutes: 75
     steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Select target
-        id: config
-        shell: bash
+      - name: Verify package revision
         env:
-          INPUT_SERIES: ${{ inputs.series || 'resolute' }}
-          INPUT_REVISION: ${{ inputs.revision || '1' }}
+          REVISION: ${{ inputs.revision || '1' }}
         run: |
-          set -euo pipefail
-          case "$INPUT_SERIES" in resolute|noble|jammy) ;; *) exit 2 ;; esac
-          [[ "$INPUT_REVISION" =~ ^[1-9][0-9]*$ ]] || exit 2
-          echo "series=$INPUT_SERIES" >> "$GITHUB_OUTPUT"
-          echo "revision=$INPUT_REVISION" >> "$GITHUB_OUTPUT"
-      - name: Configure signed Debian source-only repository
+          [[ "$REVISION" =~ ^[1-9][0-9]*$ ]] || exit 2
+      - name: Configure verified source archives
         run: sudo bash scripts/setup-build-env.sh
-      - name: Build source package without credentials
-        run: bash scripts/build-source.sh "$SERIES" "$REVISION"
+      - name: Build FFmpeg source for ${{ matrix.series }}
         env:
-          SERIES: ${{ steps.config.outputs.series }}
-          REVISION: ${{ steps.config.outputs.revision }}
-      - name: Validate source package
-        run: bash scripts/verify-source.sh "$SERIES"
-        env:
-          SERIES: ${{ steps.config.outputs.series }}
-      - name: Verify target Ubuntu build dependencies
-        run: bash scripts/check-build-deps.sh "$SERIES"
-        env:
-          SERIES: ${{ steps.config.outputs.series }}
-      - name: Upload unsigned source package (no secrets)
+          REVISION: ${{ inputs.revision || '1' }}
+        run: bash scripts/build-source.sh "${{ matrix.series }}" "$REVISION"
+      - name: Validate package and target Ubuntu build dependencies
+        run: |
+          bash scripts/verify-source.sh "${{ matrix.series }}"
+          bash scripts/check-build-deps.sh "${{ matrix.series }}"
+      - name: Upload verified unsigned source
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ffmpeg-source-for-ppa
-          path: dist/${{ steps.config.outputs.series }}/
+          name: ffmpeg-ppa-source-${{ matrix.series }}
+          path: dist/${{ matrix.series }}/
           if-no-files-found: error
           retention-days: 3
 
   publish:
-    needs: prepare
-    # Upstream Debian scripts do not run in this credential-bearing job.
+    needs: [check-upstream, prepare]
+    name: Upload ${{ matrix.series }} to Launchpad
+    strategy:
+      fail-fast: false
+      matrix:
+        series: ${{ fromJSON(needs.check-upstream.outputs.series) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
-      - name: Check out publication scripts
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Download prepared source package
+      - name: Download source package for this Ubuntu release
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: ffmpeg-source-for-ppa
-          path: dist/${{ needs.prepare.outputs.series }}
+          name: ffmpeg-ppa-source-${{ matrix.series }}
+          path: dist/${{ matrix.series }}
       - name: Install publication tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            dpkg-dev devscripts dput openssh-client
-      - name: Validate package and PPA version
-        id: ppa_check
-        shell: bash
+          sudo apt-get install -y --no-install-recommends dpkg-dev devscripts dput
+      - name: Verify this package is newer than Launchpad
+        id: existing
         env:
-          SERIES: ${{ needs.prepare.outputs.series }}
+          SERIES: ${{ matrix.series }}
         run: |
           set -euo pipefail
           bash scripts/verify-source.sh "$SERIES"
@@ -128,42 +128,25 @@ jobs:
           changes=(dist/"$SERIES"/ffmpeg_*_source.changes)
           [[ ${#changes[@]} -eq 1 ]] || exit 1
           python3 scripts/check_launchpad.py \
-            --owner alexanderwagnerdev \
-            --archive ffmpeg \
-            --series "$SERIES" \
-            --changes "${changes[0]}"
-
-      - name: Validate registered OpenPGP upload key
-        if: steps.ppa_check.outputs.publish == 'true'
-        shell: bash
+            --owner alexanderwagnerdev --archive ffmpeg \
+            --series "$SERIES" --changes "${changes[0]}"
+      - name: Sign and upload (OpenPGP)
+        if: steps.existing.outputs.publish == 'true'
         env:
+          SERIES: ${{ matrix.series }}
           PPA_GPG_PRIVATE_KEY_B64: ${{ secrets.PPA_GPG_PRIVATE_KEY_B64 }}
           PPA_GPG_FINGERPRINT: ${{ secrets.PPA_GPG_FINGERPRINT }}
         run: |
           set -euo pipefail
-          for var in PPA_GPG_PRIVATE_KEY_B64 PPA_GPG_FINGERPRINT; do
-            [[ -n "${!var}" ]] || { echo "::error::Missing GitHub repository secret: $var"; exit 1; }
-          done
-
-      - name: Sign and upload source to Launchpad PPA
-        if: steps.ppa_check.outputs.publish == 'true'
-        shell: bash
-        env:
-          SERIES: ${{ needs.prepare.outputs.series }}
-          PPA_GPG_PRIVATE_KEY_B64: ${{ secrets.PPA_GPG_PRIVATE_KEY_B64 }}
-          PPA_GPG_FINGERPRINT: ${{ secrets.PPA_GPG_FINGERPRINT }}
-        run: |
-          set -euo pipefail
+          [[ -n "$PPA_GPG_PRIVATE_KEY_B64" && -n "$PPA_GPG_FINGERPRINT" ]] || {
+            echo "Missing repository signing secrets" >&2; exit 1;
+          }
           umask 077
           mkdir -p "$HOME/.gnupg"
-          chmod 700 "$HOME/.gnupg"
           printf '%s' "$PPA_GPG_PRIVATE_KEY_B64" | base64 --decode | gpg --batch --import
           gpg --batch --list-secret-keys "$PPA_GPG_FINGERPRINT" >/dev/null
           shopt -s nullglob
           changes=(dist/"$SERIES"/ffmpeg_*_source.changes)
-          [[ ${#changes[@]} -eq 1 ]] || { echo "Expected one source changes file" >&2; exit 1; }
+          [[ ${#changes[@]} -eq 1 ]] || exit 1
           debsign -k "$PPA_GPG_FINGERPRINT" "${changes[0]}"
-          # Same Launchpad dput transport used by OpenRTMP/librtmp2:
-          # Launchpad verifies the OpenPGP signature; no SSH key is required.
           dput "ppa:alexanderwagnerdev/ffmpeg" "${changes[0]}"
-          echo "Source package submitted. Monitor Launchpad for acceptance and binary builds."

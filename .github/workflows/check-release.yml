@@ -1,0 +1,83 @@
+name: Check FFmpeg stable release
+
+on:
+  workflow_call:
+    inputs:
+      force:
+        description: Rebuild and republish even if both channels are current
+        type: boolean
+        default: false
+        required: false
+    outputs:
+      build:
+        description: Whether a complete validated build is required
+        value: ${{ jobs.check.outputs.build }}
+      pages:
+        description: Whether the GitHub Pages APT channel needs publication
+        value: ${{ jobs.check.outputs.pages }}
+      ppa:
+        description: Whether the Launchpad PPA channel needs publication
+        value: ${{ jobs.check.outputs.ppa }}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.decide.outputs.build }}
+      pages: ${{ steps.decide.outputs.pages }}
+      ppa: ${{ steps.decide.outputs.ppa }}
+    steps:
+      - name: Ensure releases only run from main
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" != 'refs/heads/main' ]]; then
+            echo "::error::Releases must run from the main branch"
+            exit 1
+          fi
+      - name: Checkout packaging scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Compare stable FFmpeg with GitHub Pages APT
+        id: pages
+        run: python3 scripts/needs_release.py --channel pages
+      - name: Compare stable FFmpeg with Launchpad PPA
+        id: ppa
+        run: python3 scripts/needs_release.py --channel ppa
+      - name: Decide which channels require publication
+        id: decide
+        shell: bash
+        env:
+          FORCE: ${{ inputs.force }}
+          PAGES_UPDATE: ${{ steps.pages.outputs.update }}
+          PPA_UPDATE: ${{ steps.ppa.outputs.update }}
+          STABLE_VERSION: ${{ steps.pages.outputs.version }}
+        run: |
+          set -euo pipefail
+          pages="$PAGES_UPDATE"
+          ppa="$PPA_UPDATE"
+          if [[ "$FORCE" == 'true' ]]; then
+            pages=true
+            ppa=true
+          fi
+          build=false
+          if [[ "$pages" == 'true' || "$ppa" == 'true' ]]; then
+            build=true
+          fi
+          {
+            echo "build=$build"
+            echo "pages=$pages"
+            echo "ppa=$ppa"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### FFmpeg release check"
+            echo ""
+            echo "- Latest stable: $STABLE_VERSION"
+            echo "- Build required: $build"
+            echo "- GitHub Pages publication: $pages"
+            echo "- Launchpad PPA publication: $ppa"
+            echo "- Forced: $FORCE"
+          } >> "$GITHUB_STEP_SUMMARY"

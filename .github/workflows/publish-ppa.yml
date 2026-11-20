@@ -18,8 +18,8 @@ on:
         required: true
         default: '1'
   schedule:
-    # Optional automatic update. Disabled until PPA_AUTO_PUBLISH=true is configured.
-    - cron: '31 5 * * 2'
+    # Daily upstream stable check; skip when already published.
+    - cron: '31 5 * * *'
 
 permissions:
   contents: read
@@ -29,10 +29,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check-upstream:
+    name: Check for a new stable FFmpeg release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      update: ${{ steps.compare.outputs.update }}
+      version: ${{ steps.compare.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Compare upstream and Launchpad PPA versions
+        id: compare
+        if: github.event_name == 'schedule'
+        run: python3 scripts/needs_release.py --channel ppa
+
   prepare:
+    needs: check-upstream
     if: >-
       github.ref == 'refs/heads/main' &&
-      (github.event_name == 'workflow_dispatch' || vars.PPA_AUTO_PUBLISH == 'true')
+      (github.event_name == 'workflow_dispatch' || needs.check-upstream.outputs.update == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     outputs:

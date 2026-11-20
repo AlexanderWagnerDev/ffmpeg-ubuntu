@@ -1,13 +1,26 @@
 # Contributing
 
-Thank you for helping maintain FFmpeg Ubuntu packaging.
+Thanks for your interest in improving FFmpeg packaging for Ubuntu.
 
-- Open an issue with the Ubuntu release, architecture, upstream FFmpeg version,
-  APT dependency error, and relevant Launchpad build log link.
-- Keep upstream FFmpeg source and Debian packaging provenance intact unless a
-  narrowly scoped, reviewed Ubuntu patch is required.
-- Run `python3 -m unittest discover -s tests -v`, `bash -n scripts/*.sh`,
-  and `shellcheck scripts/*.sh` before submitting a pull request.
-- Never include private keys, tokens, personal credentials, or private build logs.
-- Changes to release or publishing automation require careful review because
-  only signed source uploads are accepted by Launchpad.
+## Reporting problems
+
+Open a GitHub issue with your Ubuntu version, architecture, FFmpeg package version, the repository you installed from, and the relevant APT or runtime output. Link to a failed build if applicable.
+
+Use [private security reporting](SECURITY.md) for vulnerabilities or sensitive information.
+
+## Pull requests
+
+- Keep each change focused on Ubuntu packaging, compatibility, CI, tests, or documentation.
+- Preserve upstream FFmpeg and Debian packaging provenance and license notices.
+- Add regression tests for changes to dependency generation or versioning.
+- Do not commit generated binaries, signing keys, tokens, or private data.
+
+Before submitting:
+
+```bash
+python3 -m unittest discover -s tests -v
+bash -n scripts/*.sh
+shellcheck scripts/*.sh
+```
+
+FFmpeg source-code defects belong in the upstream FFmpeg project; this repository focuses on distributing Ubuntu packages.

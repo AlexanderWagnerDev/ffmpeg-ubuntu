@@ -1,12 +1,7 @@
 # Security Policy
 
-Report vulnerabilities privately using GitHub's **Report a vulnerability**
-feature in the repository's Security tab (if enabled), rather than publishing
-credential details or proof-of-concept exploits in an issue.
+Report vulnerabilities in the package automation or distribution infrastructure **privately**, using [GitHub Security Advisories](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/security/advisories) when private vulnerability reporting is enabled. Please do not publish exploit details or credentials in issues.
 
-CI signing credentials must be stored only as GitHub Environment secrets.
-Do not commit personal OpenPGP private keys, SSH private keys, or access tokens.
-Rotate affected credentials immediately if exposed.
+For security problems in FFmpeg itself, consult the [FFmpeg security page](https://ffmpeg.org/security.html). Packaging vulnerabilities may also require reporting to the Debian or Ubuntu security teams.
 
-FFmpeg and Debian source-package vulnerabilities should also be reported to
-their relevant upstream security processes.
+These are independent community builds; their update cadence and security support may differ from Ubuntu's official packages.

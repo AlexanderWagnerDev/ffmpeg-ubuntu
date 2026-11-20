@@ -1,108 +1,72 @@
 # FFmpeg for Ubuntu
 
 [![CI](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/ci.yml/badge.svg)](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/ci.yml)
-[![Build source](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/build-source.yml/badge.svg)](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/build-source.yml)
+[![Binary builds](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/binary-ci.yml/badge.svg)](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/binary-ci.yml)
+[![GitHub Pages](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/pages-apt.yml/badge.svg)](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/pages-apt.yml)
 
-Ubuntu source and binary packaging for **FFmpeg 9**, with two independent distribution methods: **signed GitHub Pages APT repository** (without Launchpad) and an optional **Launchpad PPA**.
+**Community-maintained FFmpeg 9 packages for Ubuntu.**
 
-**Status:** FFmpeg 9.0.2 source-package generation and Ubuntu 26.04 build-dependency resolution have passed CI. Native AMD64 and ARM64 binary builds and signed GitHub Pages APT publication are now implemented but **not yet confirmed successful end-to-end**. Do not use the Pages APT URL until the first deployment passes. Launchpad is optional; no Launchpad binary build is verified yet.
+FFmpeg for Ubuntu rebuilds the multimedia toolkit and its libraries from Debian's FFmpeg source packaging for Ubuntu. Packages are distributed independently through a [Launchpad PPA](https://launchpad.net/~alexanderwagnerdev/+archive/ubuntu/ffmpeg) and a [signed GitHub Pages APT repository](https://alexanderwagnerdev.github.io/ffmpeg-ubuntu/).
 
-| Link | Purpose |
-|---|---|
-| [Launchpad project](https://launchpad.net/awdev-ffmpeg) | Project identity and information |
-| [GitHub Pages APT](https://alexanderwagnerdev.github.io/ffmpeg-ubuntu/) | Independent signed APT repository, after deployment succeeds |
-| [Optional PPA](https://launchpad.net/~alexanderwagnerdev/+archive/ubuntu/ffmpeg) | Alternative package publishing if separately set up |
-| [FFmpeg upstream](https://ffmpeg.org/) | Original multimedia software |
-| [Debian FFmpeg source](https://tracker.debian.org/pkg/ffmpeg) | Source package definitions used by the build |
+This is an independent project, not an official FFmpeg or Ubuntu distribution.
 
-## Architecture
+## Installation
 
-1. Obtain the FFmpeg 9.x source package from the **signed Debian testing source repository** (only `deb-src`, not binary sources).
-2. Keep Debian's packaging and patches. Add a unique Ubuntu-series-specific changelog version.
-3. Produce a Debian/Ubuntu **source upload**, validate it by extracting the newly generated `.dsc`, check whether the target Ubuntu release can resolve its declared build dependencies, and store it as a GitHub Actions artifact.
-4. For **GitHub Pages**, compile native AMD64 and ARM64 binary packages on separate GitHub runners using Ubuntu 26.04 containers; test their installation in clean containers.
-5. In a separate signing job using repository secrets, generate signed APT metadata for both architectures and publish the complete package repository to GitHub Pages.
-6. Alternatively, upload a signed source package through the **optional Launchpad PPA** workflow; Launchpad then handles its own binary builds.
+Before installing, confirm that binaries have been **successfully published** for your Ubuntu release and architecture. Source builds alone do not prove package availability.
 
-The GitHub Pages workflow uses separate binary-build, signing and deployment jobs, keeping signing secrets away from the source compilation stage. The optional Launchpad workflow similarly isolates its OpenPGP signing credentials and uploads with `dput ppa:…` (no SSH key required).
+### Launchpad PPA
 
-## Ubuntu support
-
-| Ubuntu | Architecture target | Status |
-|---|---|---|
-| **26.04 LTS (resolute)** | amd64, arm64 | GitHub Pages native binary builds configured; end-to-end checks pending |
-| 24.04 LTS (noble) | amd64, arm64 | Experimental; dependency backports may be needed |
-| 22.04 LTS (jammy) | amd64, arm64 | Experimental; dependency backports may be needed |
-
-Debian's `debhelper-compat (= 14)` requirement is adapted to level 13 for Resolute, where level 14 is unavailable. A full native binary build is still necessary to validate this backport.
-
-The Launchpad PPA must have `arm64` enabled explicitly. Do not assume a source package validated on GitHub can be built against every Ubuntu release or architecture.
-
-## Local checks
-
-```bash
-python3 -m unittest discover -s tests -v
-bash -n scripts/*.sh
-shellcheck scripts/*.sh
-```
-
-Generate a source upload (on Ubuntu; adds a **source-only** Debian APT entry):
-
-```bash
-sudo bash scripts/setup-build-env.sh
-bash scripts/build-source.sh resolute 1
-bash scripts/verify-source.sh resolute
-```
-
-Artifacts are written to `dist/resolute/`. Remove `work/resolute/` and
-`dist/resolute/` before repeating the local build to avoid stale files.
-
-## CI and maintenance
-
-| Workflow | Operation |
-|---|---|
-| [CI](.github/workflows/ci.yml) | Python unit tests, ShellCheck, bash syntax |
-| [Build Ubuntu source package](.github/workflows/build-source.yml) | Builds and validates unsigned source packages on push/manual runs and weekly; stores artifacts |
-| [Publish FFmpeg APT via GitHub Pages](.github/workflows/pages-apt.yml) | Native AMD64 and ARM64 builds, installation smoke tests, signed APT indexes, Pages deployment |
-| [Publish to Launchpad PPA](.github/workflows/publish-ppa.yml) | Optional OpenPGP-signed source upload via `dput ppa:…`; no SSH secrets; manual or **opt-in** scheduled publishing |
-| [Dependabot](.github/dependabot.yml) | GitHub Actions dependency maintenance |
-
-All external GitHub Actions are pinned to commit hashes.
-
-**Both scheduled publishing paths are disabled by default.** First configure [GitHub Pages APT](docs/GITHUB-PAGES.md) and its dedicated key. Launchpad is a separate, optional [setup](docs/LAUNCHPAD.md), requiring only two dedicated OpenPGP repository secrets. Only enable scheduled publishing after an end-to-end install passes.
-
-## Install through GitHub Pages (after the first successful deployment)
-
-Use the public signing key from the deployed repository and a Deb822 `.sources` file. The full AMD64 and ARM64 instructions are in [GitHub Pages APT setup](docs/GITHUB-PAGES.md).
-
-The expected source URI is `https://alexanderwagnerdev.github.io/ffmpeg-ubuntu/` for Ubuntu 26.04 `resolute`. Verify the signing-key fingerprint independently before trusting a new repository.
-
-## Optional Launchpad installation (only after the PPA builds successfully)
+Once packages are available for your Ubuntu release:
 
 ```bash
 sudo add-apt-repository ppa:alexanderwagnerdev/ffmpeg
 sudo apt update
 apt-cache policy ffmpeg
-sudo apt -s install ffmpeg
-```
-
-After inspecting the dry run:
-
-```bash
 sudo apt install ffmpeg
 ffmpeg -version
 ```
 
-When Ubuntu Pro/ESM or another package source takes precedence, compare the
-versions and APT priority with `apt-cache policy ffmpeg`. Avoid global pinning
-or disabling security updates.
+### GitHub Pages APT
 
-## Licensing
+A standalone signed APT repository that does not depend on Launchpad:
 
-Automation and supporting repository materials follow [LICENSE](LICENSE).
-FFmpeg and Debian packaging have their **own licenses and copyright notices**;
-the license in this repository does not supersede them. Rebuilding and
-redistributing multimedia codecs can have additional legal/technical
-requirements depending on build configuration and jurisdiction.
+**https://alexanderwagnerdev.github.io/ffmpeg-ubuntu/**
 
-Issues and PRs are welcome.
+See the [installation guide](docs/INSTALLATION.md) for the public keyring, APT source file, verification, and removal instructions. Use the Pages repository **only after a successful deployment**.
+
+## Supported platforms
+
+| Ubuntu | AMD64 | ARM64 |
+|---|---|---|
+| **26.04 LTS (Resolute)** | Build target | Build target |
+| 24.04 LTS (Noble) | Not yet supported | Not yet supported |
+| 22.04 LTS (Jammy) | Not yet supported | Not yet supported |
+
+A **build target is not a guarantee that installable packages have been published**. Check the [workflow results](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions) and [PPA package status](https://launchpad.net/~alexanderwagnerdev/+archive/ubuntu/ffmpeg).
+
+## Packages and features
+
+The Debian FFmpeg source package produces the `ffmpeg` and `ffplay` tools, `ffprobe`, FFmpeg shared libraries, and development packages, subject to successful native builds and packaging options.
+
+- FFmpeg 9 audio/video encoding, decoding, transcoding and streaming.
+- APT-native dependency management and cryptographically signed repository metadata.
+- Native Ubuntu 26.04 AMD64 and ARM64 binary builds and installation tests.
+- Public source packaging automation and transparent build results.
+
+## Build provenance
+
+The source package comes from the **signed Debian testing source index**. Ubuntu-specific packaging adjustments are applied during source preparation. Native binary builds, dependency checks, and clean-container installation tests are performed before the GitHub Pages channel can publish.
+
+Launchpad runs a separate binary build after accepting a signed source upload. Availability and results may differ across distribution channels.
+
+**Upstream:** [FFmpeg](https://ffmpeg.org/) · **Debian source:** [Debian FFmpeg](https://tracker.debian.org/pkg/ffmpeg) · **Automation:** [GitHub Actions](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions)
+
+## Contributions and support
+
+For a package installation or compatibility issue, [open an issue](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/issues) and include the Ubuntu version, architecture, package version, and full error message. See [CONTRIBUTING.md](CONTRIBUTING.md) for development contributions and [SECURITY.md](SECURITY.md) for private security reporting.
+
+## License and attribution
+
+The automation in this repository uses the [MIT License](LICENSE). FFmpeg, its included components, and Debian packaging retain their own licenses and copyright notices; availability and permitted redistribution of some codecs may vary by configuration and jurisdiction.
+
+**This community-maintained package repository is not affiliated with or endorsed by FFmpeg, Debian, Canonical, or Ubuntu.**

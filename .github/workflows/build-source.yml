@@ -1,4 +1,4 @@
-name: Build Ubuntu source package
+name: Build Ubuntu source packages
 on:
   push:
     branches: [main]
@@ -14,17 +14,8 @@ on:
       - '.github/workflows/build-source.yml'
   workflow_dispatch:
     inputs:
-      series:
-        description: Ubuntu series
-        required: true
-        default: resolute
-        type: choice
-        options:
-          - resolute
-          - noble
-          - jammy
       revision:
-        description: Increment when rebuilding an already published Debian version
+        description: Increment when rebuilding previously published version
         required: true
         default: '1'
         type: string
@@ -36,10 +27,15 @@ permissions:
 
 jobs:
   source:
+    strategy:
+      fail-fast: false
+      matrix:
+        series: [noble, resolute, stonking]
+    name: Source package ${{ matrix.series }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
     env:
-      SERIES: ${{ inputs.series || 'resolute' }}
+      SERIES: ${{ matrix.series }}
       REVISION: ${{ inputs.revision || '1' }}
     steps:
       - name: Checkout
@@ -52,12 +48,12 @@ jobs:
         run: bash scripts/build-source.sh "$SERIES" "$REVISION"
       - name: Validate source package
         run: bash scripts/verify-source.sh "$SERIES"
-      - name: Upload unsigned source archive for inspection
+      - name: Verify Ubuntu build dependencies
+        run: bash scripts/check-build-deps.sh "$SERIES"
+      - name: Preserve source package for inspection
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ffmpeg-source-${{ env.SERIES }}
-          path: dist/${{ env.SERIES }}/
+          name: ffmpeg-source-${{ matrix.series }}
+          path: dist/${{ matrix.series }}/
           if-no-files-found: error
-          retention-days: 14
-      - name: Verify target Ubuntu build dependencies
-        run: bash scripts/check-build-deps.sh "$SERIES"
+          retention-days: 7

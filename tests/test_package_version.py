@@ -16,8 +16,11 @@ class PackageVersionTests(unittest.TestCase):
         )
 
     def test_supported_series(self):
-        self.assertIn("ubuntu22.04", MODULE.ubuntu_version("7:9.0.2-6", "jammy", 2))
         self.assertIn("ubuntu24.04", MODULE.ubuntu_version("7:9.0.2-6", "noble", 3))
+        self.assertIn("ubuntu26.04", MODULE.ubuntu_version("7:9.0.2-6", "resolute", 2))
+        self.assertIn("ubuntu26.10", MODULE.ubuntu_version("7:9.0.2-6", "stonking", 3))
+        with self.assertRaises(ValueError):
+            MODULE.ubuntu_version("7:9.0.2-6", "jammy", 1)
 
     def test_rejects_wrong_major(self):
         for version in ("7:8.1-3", "not-a-version"):

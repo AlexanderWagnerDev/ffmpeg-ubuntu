@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       revision:
-        description: Positive revision for the current Debian source package
+        description: Positive package revision
         required: true
         type: string
         default: '1'
   schedule:
-    # Daily upstream stable check; skip when already published.
+    # Daily stable-version check; publish only when a suite needs updating.
     - cron: '13 7 * * *'
 
 permissions:
@@ -21,19 +21,16 @@ concurrency:
 
 jobs:
   check-upstream:
-    name: Check for a new stable FFmpeg release
+    name: Check FFmpeg releases and published Ubuntu suites
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     outputs:
-      update: ${{ steps.compare.outputs.update }}
-      version: ${{ steps.compare.outputs.version }}
+      update: ${{ steps.check.outputs.update }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Compare upstream and published Pages APT version
-        id: compare
+      - name: Compare latest stable upstream with public APT versions
+        id: check
         if: github.event_name == 'schedule'
         run: python3 scripts/needs_release.py --channel pages
 
@@ -42,11 +39,15 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'workflow_dispatch' || needs.check-upstream.outputs.update == 'true')
-    name: Prepare latest stable FFmpeg source package
+    name: Prepare ${{ matrix.series }} FFmpeg source
+    strategy:
+      fail-fast: false
+      matrix:
+        series: [noble, resolute, stonking]
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
     steps:
-      - name: Check out source automation
+      - name: Checkout verified packaging automation
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -55,112 +56,119 @@ jobs:
           REVISION: ${{ inputs.revision || '1' }}
         run: |
           [[ "$REVISION" =~ ^[1-9][0-9]*$ ]] || exit 2
-      - name: Configure signed Debian source index
+      - name: Configure signed Debian source repository
         run: sudo bash scripts/setup-build-env.sh
-      - name: Assemble and validate latest stable FFmpeg source
+      - name: Build and validate FFmpeg source
         env:
           REVISION: ${{ inputs.revision || '1' }}
         run: |
-          bash scripts/build-source.sh resolute "$REVISION"
-          bash scripts/verify-source.sh resolute
-      - name: Share one source with both native-architecture builds
+          bash scripts/build-source.sh "${{ matrix.series }}" "$REVISION"
+          bash scripts/verify-source.sh "${{ matrix.series }}"
+      - name: Upload prepared source for native builds
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ffmpeg-resolute-source
-          path: dist/resolute/
+          name: ffmpeg-source-${{ matrix.series }}
+          path: dist/${{ matrix.series }}/
           if-no-files-found: error
           retention-days: 3
 
   build:
     needs: prepare-source
-    name: Build FFmpeg for ${{ matrix.arch }}
+    name: Build and test ${{ matrix.series }} ${{ matrix.arch }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - arch: amd64
+          - series: noble
+            arch: amd64
             runner: ubuntu-latest
-          - arch: arm64
+          - series: noble
+            arch: arm64
+            runner: ubuntu-26.04-arm
+          - series: resolute
+            arch: amd64
+            runner: ubuntu-latest
+          - series: resolute
+            arch: arm64
+            runner: ubuntu-26.04-arm
+          - series: stonking
+            arch: amd64
+            runner: ubuntu-latest
+          - series: stonking
+            arch: arm64
             runner: ubuntu-26.04-arm
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 300
     steps:
-      - name: Check out code without storing credentials
+      - name: Checkout scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Verify native build architecture
+      - name: Verify native architecture
         env:
-          ARCH: ${{ matrix.arch }}
+          TARGET_ARCH: ${{ matrix.arch }}
         run: |
-          set -euo pipefail
-          if [[ "$ARCH" == amd64 ]]; then
-            test "$(uname -m)" = x86_64
-          else
-            test "$(uname -m)" = aarch64
-          fi
+          case "$(uname -m):$TARGET_ARCH" in
+            x86_64:amd64|aarch64:arm64) ;;
+            *) echo "Runner is not the target architecture" >&2; exit 1 ;;
+          esac
           docker info >/dev/null
-      - name: Download the same validated source package for both architectures
+      - name: Download source for target Ubuntu release
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: ffmpeg-resolute-source
-          path: dist/resolute
-      - name: Check source archive and native build dependencies
+          name: ffmpeg-source-${{ matrix.series }}
+          path: dist/${{ matrix.series }}
+      - name: Verify source and Ubuntu build dependencies
         run: |
-          bash scripts/verify-source.sh resolute
-          bash scripts/check-build-deps.sh resolute
-      - name: Compile FFmpeg binary packages in native Ubuntu 26.04
-        run: bash scripts/build-binaries.sh resolute ${{ matrix.arch }}
-      - name: Test installation and transcoding in fresh Ubuntu 26.04
-        run: bash scripts/test-binaries.sh resolute ${{ matrix.arch }}
-      - name: Upload tested architecture packages
+          bash scripts/verify-source.sh "${{ matrix.series }}"
+          bash scripts/check-build-deps.sh "${{ matrix.series }}"
+      - name: Build FFmpeg binaries in native target Ubuntu container
+        run: bash scripts/build-binaries.sh "${{ matrix.series }}" "${{ matrix.arch }}"
+      - name: Install and smoke-test binaries in fresh target Ubuntu container
+        run: bash scripts/test-binaries.sh "${{ matrix.series }}" "${{ matrix.arch }}"
+      - name: Save tested binary packages
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ffmpeg-resolute-${{ matrix.arch }}
-          path: binaries/resolute/${{ matrix.arch }}/*.deb
+          name: ffmpeg-bin-${{ matrix.series }}-${{ matrix.arch }}
+          path: binaries/${{ matrix.series }}/${{ matrix.arch }}/*.deb
           if-no-files-found: error
           retention-days: 3
           compression-level: 0
 
   sign:
     needs: build
-    name: Sign AMD64 and ARM64 APT indexes
+    name: Sign all three Ubuntu APT suites
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
-      - name: Check out only repository signing scripts
+      - name: Checkout APT signing scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Download tested AMD64 packages
+      - name: Download all six tested Ubuntu builds
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: ffmpeg-resolute-amd64
-          path: binaries/resolute/amd64
-      - name: Download tested ARM64 packages
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: ffmpeg-resolute-arm64
-          path: binaries/resolute/arm64
-      - name: Install APT archive and signature utilities
+          pattern: ffmpeg-bin-*
+          path: package-artifacts
+      - name: Install APT signing and index utilities
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends dpkg-dev apt-utils gnupg
-      - name: Assemble signed repository for both architectures
+      - name: Assemble and sign all Ubuntu suites
         env:
           PAGES_APT_GPG_PRIVATE_KEY_B64: ${{ secrets.PAGES_APT_GPG_PRIVATE_KEY_B64 }}
           PAGES_APT_GPG_FINGERPRINT: ${{ secrets.PAGES_APT_GPG_FINGERPRINT }}
-        run: bash scripts/assemble-pages.sh binaries/resolute
-      - name: Validate both repository indexes with APT
+        run: bash scripts/assemble-pages.sh package-artifacts
+      - name: Verify APT signature and package indexes for all architectures
         run: bash scripts/verify-pages-apt.sh
-      - name: Upload signed static GitHub Pages repository
+      - name: Upload complete GitHub Pages repository
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site
 
   deploy:
     needs: sign
-    name: Deploy repository on GitHub Pages
+    name: Publish verified APT repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:

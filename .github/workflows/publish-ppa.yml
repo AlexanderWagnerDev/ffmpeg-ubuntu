@@ -116,57 +116,37 @@ jobs:
             --series "$SERIES" \
             --changes "${changes[0]}"
 
-      - name: Validate CI credentials
+      - name: Validate registered OpenPGP upload key
         if: steps.ppa_check.outputs.publish == 'true'
         shell: bash
         env:
           PPA_GPG_PRIVATE_KEY_B64: ${{ secrets.PPA_GPG_PRIVATE_KEY_B64 }}
           PPA_GPG_FINGERPRINT: ${{ secrets.PPA_GPG_FINGERPRINT }}
-          PPA_SSH_PRIVATE_KEY: ${{ secrets.PPA_SSH_PRIVATE_KEY }}
-          PPA_SSH_KNOWN_HOSTS: ${{ secrets.PPA_SSH_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
-          for var in PPA_GPG_PRIVATE_KEY_B64 PPA_GPG_FINGERPRINT PPA_SSH_PRIVATE_KEY PPA_SSH_KNOWN_HOSTS; do
+          for var in PPA_GPG_PRIVATE_KEY_B64 PPA_GPG_FINGERPRINT; do
             [[ -n "${!var}" ]] || { echo "::error::Missing Launchpad environment secret: $var"; exit 1; }
           done
 
-      - name: Sign and upload to Launchpad by SFTP
+      - name: Sign and upload source to Launchpad PPA
         if: steps.ppa_check.outputs.publish == 'true'
         shell: bash
         env:
           SERIES: ${{ needs.prepare.outputs.series }}
           PPA_GPG_PRIVATE_KEY_B64: ${{ secrets.PPA_GPG_PRIVATE_KEY_B64 }}
           PPA_GPG_FINGERPRINT: ${{ secrets.PPA_GPG_FINGERPRINT }}
-          PPA_SSH_PRIVATE_KEY: ${{ secrets.PPA_SSH_PRIVATE_KEY }}
-          PPA_SSH_KNOWN_HOSTS: ${{ secrets.PPA_SSH_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
           umask 077
-          mkdir -p "$HOME/.gnupg" "$HOME/.ssh"
+          mkdir -p "$HOME/.gnupg"
+          chmod 700 "$HOME/.gnupg"
           printf '%s' "$PPA_GPG_PRIVATE_KEY_B64" | base64 --decode | gpg --batch --import
           gpg --batch --list-secret-keys "$PPA_GPG_FINGERPRINT" >/dev/null
-          printf '%s\n' "$PPA_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
-          printf '%s\n' "$PPA_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
-          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
-          cat > "$HOME/.ssh/config" <<'SSH'
-          Host ppa.launchpad.net
-            IdentityFile ~/.ssh/id_ed25519
-            IdentitiesOnly yes
-            StrictHostKeyChecking yes
-          SSH
-          chmod 600 "$HOME/.ssh/config"
-          cat > "$HOME/.dput.cf" <<'DPUT'
-          [awdev-ffmpeg-ppa]
-          fqdn = ppa.launchpad.net
-          method = sftp
-          incoming = ~alexanderwagnerdev/ubuntu/ffmpeg/
-          login = alexanderwagnerdev
-          allow_unsigned_uploads = 0
-          DPUT
-          chmod 600 "$HOME/.dput.cf"
           shopt -s nullglob
           changes=(dist/"$SERIES"/ffmpeg_*_source.changes)
-          [[ ${#changes[@]} -eq 1 ]] || exit 1
+          [[ ${#changes[@]} -eq 1 ]] || { echo "Expected one source changes file" >&2; exit 1; }
           debsign -k "$PPA_GPG_FINGERPRINT" "${changes[0]}"
-          dput awdev-ffmpeg-ppa "${changes[0]}"
-          echo "Source submitted. Launchpad still has to accept it and build binaries."
+          # Same Launchpad dput transport used by OpenRTMP/librtmp2:
+          # Launchpad verifies the OpenPGP signature; no SSH key is required.
+          dput "ppa:alexanderwagnerdev/ffmpeg" "${changes[0]}"
+          echo "Source package submitted. Monitor Launchpad for acceptance and binary builds."

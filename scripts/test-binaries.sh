@@ -2,12 +2,18 @@
 set -euo pipefail
 
 # Test apt dependency resolution and basic runtime behavior in a clean native
-# Ubuntu 26.04 container, before any package is allowed into the public repo.
+# target Ubuntu container, before any package is allowed into the public repo.
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SERIES="${1:-}"
 ARCH="${2:-}"
-[[ "$SERIES" == resolute && ( "$ARCH" == amd64 || "$ARCH" == arm64 ) ]] || {
-  echo "Usage: $0 resolute amd64|arm64" >&2; exit 2;
+case "$SERIES" in
+  noble) RELEASE=24.04 ;;
+  resolute) RELEASE=26.04 ;;
+  stonking) RELEASE=26.10 ;;
+  *) echo "Usage: $0 noble|resolute|stonking amd64|arm64" >&2; exit 2 ;;
+esac
+[[ "$ARCH" == amd64 || "$ARCH" == arm64 ]] || {
+  echo "Architecture must be amd64 or arm64" >&2; exit 2;
 }
 BINARIES="$ROOT/binaries/$SERIES/$ARCH"
 shopt -s nullglob
@@ -17,7 +23,7 @@ packages=("$BINARIES"/*.deb)
 docker run --rm \
   --mount "type=bind,src=$BINARIES,dst=/packages,readonly" \
   --env DEBIAN_FRONTEND=noninteractive \
-  ubuntu:26.04 bash -euo pipefail -c '
+  "ubuntu:$RELEASE" bash -euo pipefail -c '
     apt-get update -qq
     apt-get install -y --no-install-recommends dpkg-dev
     mkdir -p /tmp/aptrepo

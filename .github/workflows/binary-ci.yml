@@ -24,10 +24,25 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - arch: amd64
+          - series: noble
+            arch: amd64
             runner: ubuntu-latest
-          - arch: arm64
+          - series: noble
+            arch: arm64
             runner: ubuntu-26.04-arm
+          - series: resolute
+            arch: amd64
+            runner: ubuntu-latest
+          - series: resolute
+            arch: arm64
+            runner: ubuntu-26.04-arm
+          - series: stonking
+            arch: amd64
+            runner: ubuntu-latest
+          - series: stonking
+            arch: arm64
+            runner: ubuntu-26.04-arm
+    name: FFmpeg ${{ matrix.series }}/${{ matrix.arch }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 300
     steps:
@@ -35,15 +50,15 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Configure Debian source-only package index
+      - name: Configure signed source index
         run: sudo bash scripts/setup-build-env.sh
-      - name: Assemble Ubuntu 26.04 source
-        run: bash scripts/build-source.sh resolute 1
-      - name: Verify Ubuntu source archive
-        run: bash scripts/verify-source.sh resolute
-      - name: Check package build dependencies
-        run: bash scripts/check-build-deps.sh resolute
+      - name: Build Ubuntu source
+        run: bash scripts/build-source.sh "${{ matrix.series }}" 1
+      - name: Verify package source
+        run: bash scripts/verify-source.sh "${{ matrix.series }}"
+      - name: Verify Ubuntu build dependencies
+        run: bash scripts/check-build-deps.sh "${{ matrix.series }}"
       - name: Compile native FFmpeg packages
-        run: bash scripts/build-binaries.sh resolute ${{ matrix.arch }}
+        run: bash scripts/build-binaries.sh "${{ matrix.series }}" "${{ matrix.arch }}"
       - name: Install and smoke-test FFmpeg
-        run: bash scripts/test-binaries.sh resolute ${{ matrix.arch }}
+        run: bash scripts/test-binaries.sh "${{ matrix.series }}" "${{ matrix.arch }}"

@@ -2,13 +2,13 @@
 set -euo pipefail
 
 # Build an *unsigned* FFmpeg source package. No binary .debs are built here.
-# Usage: scripts/build-source.sh <jammy|noble|resolute> [ppa-revision]
+# Usage: scripts/build-source.sh <noble|resolute|stonking> [ppa-revision]
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SERIES="${1:-}"
 REVISION="${2:-1}"
 case "$SERIES" in
-  jammy|noble|resolute) ;;
-  *) echo "Usage: $0 <jammy|noble|resolute> [ppa-revision]" >&2; exit 2 ;;
+  noble|resolute|stonking) ;;
+  *) echo "Usage: $0 <noble|resolute|stonking> [ppa-revision]" >&2; exit 2 ;;
 esac
 if [[ ! "$REVISION" =~ ^[1-9][0-9]*$ ]]; then
   echo "PPA revision must be a positive integer" >&2
@@ -60,18 +60,15 @@ if dpkg --compare-versions "$UPSTREAM_RELEASE" gt "$DEBIAN_UPSTREAM"; then
   DEBIAN_VERSION="$DEBIAN_EPOCH:$UPSTREAM_RELEASE-0"
 fi
 NEW_VERSION="$(python3 "$ROOT/scripts/package_version.py" "$DEBIAN_VERSION" "$SERIES" "$REVISION")"
-# Debian testing may require newer debhelper than Ubuntu 26.04 provides.
-# Apply the limited Ubuntu compatibility patch and validate by full builds.
-if [[ "$SERIES" == "resolute" ]]; then
-  if grep -Fq 'debhelper-compat (= 14)' "$SOURCE_DIR/debian/control"; then
-    sed -i 's/debhelper-compat (= 14)/debhelper-compat (= 13)/g' "$SOURCE_DIR/debian/control"
-    echo "Using Ubuntu-compatible debhelper level 13"
-    python3 "$ROOT/scripts/patch_ubuntu_control.py" "$SOURCE_DIR/debian/control"
-  else
-    echo "Debian debhelper requirement changed; recheck Ubuntu compatibility" >&2
-    exit 1
-  fi
+# Ensure Debian's debhelper packaging can build on all supported suites.
+if grep -Fq 'debhelper-compat (= 14)' "$SOURCE_DIR/debian/control"; then
+  sed -i 's/debhelper-compat (= 14)/debhelper-compat (= 13)/g' "$SOURCE_DIR/debian/control"
+  echo "Using Ubuntu-compatible debhelper level 13"
+elif ! grep -Fq 'debhelper-compat (= 13)' "$SOURCE_DIR/debian/control"; then
+  echo "Debian debhelper requirement changed; review the packaging" >&2
+  exit 1
 fi
+python3 "$ROOT/scripts/patch_ubuntu_control.py" "$SOURCE_DIR/debian/control"
 export DEBFULLNAME="Alexander Wagner"
 export DEBEMAIL="info@alexanderwagnerdev.com"
 cd "$SOURCE_DIR"

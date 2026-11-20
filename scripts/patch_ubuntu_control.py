@@ -78,7 +78,9 @@ def current_runtime_packages(source_root: Path) -> tuple[str, ...]:
         if not match:
             raise ValueError(f"Unexpected FFmpeg package name: {old}")
         prefix = match.group(1)
-        header = source_root / prefix / "version_major.h"
+        header = source_root / prefix / (
+            "version.h" if prefix == "libavutil" else "version_major.h"
+        )
         macro = prefix.upper() + "_VERSION_MAJOR"
         if not header.is_file():
             raise ValueError(f"Missing version header: {header}")

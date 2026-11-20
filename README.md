@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/ci.yml/badge.svg)](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/ci.yml)
 [![Binary builds](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/binary-ci.yml/badge.svg)](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/binary-ci.yml)
-[![GitHub Pages](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/pages-apt.yml/badge.svg)](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/pages-apt.yml)
+[![Release pipeline](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/release-pipeline.yml/badge.svg)](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/release-pipeline.yml)
 
 **Automatically updated community-maintained FFmpeg packages for Ubuntu.**
 
@@ -53,9 +53,23 @@ The Debian FFmpeg source package produces the `ffmpeg` and `ffplay` tools, `ffpr
 - AMD64 and ARM64 binary builds and installation tests for Ubuntu 24.04, 26.04 and 26.10.
 - Public source packaging automation and transparent build results.
 
+## Automated release pipeline
+
+The [FFmpeg release pipeline](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions/workflows/release-pipeline.yml) is the **only scheduled publishing entry point**. It runs a daily upstream check at **07:13 UTC** and is also available through **Actions → FFmpeg release pipeline → Run workflow** on the `main` branch.
+
+1. **Check:** Compare the latest official stable FFmpeg release against the published versions in both channels.
+2. **Build and test:** If either channel needs an update, prepare source packages for Noble, Resolute, and Stonking; then build and smoke-test all six native Ubuntu/architecture combinations. All builds must pass.
+3. **Publish:** Only after all tests pass, sign and deploy the GitHub Pages APT repository and/or sign and upload sources to the Launchpad PPA, depending on which channel needs updating.
+
+The stages use [reusable GitHub Actions workflows](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows). Source and binary artifacts stay in the **same pipeline run**, rather than rebuilding separately for each publication channel. If neither channel needs updating, the pipeline exits without building.
+
+Manual runs accept a positive `revision` (default `1`) and a `force` toggle (default `false`). Set `force=true` to rebuild even if the stable version is already published; the Launchpad publisher still refuses to upload a duplicate or older package version. Increase `revision` when deliberately rebuilding an already published upstream version.
+
+The source-package and binary validation workflows remain available for development CI, but have **no independent release schedule**. The signing secrets must be configured before publishing; Launchpad's subsequent builds are asynchronous and may still fail or require time to become available.
+
 ## Build provenance
 
-Debian packaging comes from the **signed Debian testing source index**. When the official FFmpeg stable release is newer, its upstream-signed source tarball replaces Debian's older upstream source. Ubuntu-specific packaging and library ABI adjustments are applied during source preparation. Daily GitHub Actions cron checks detect newly available stable versions. Native binary builds, dependency checks, and clean-container installation tests must pass before the GitHub Pages channel can publish.
+Debian packaging comes from the **signed Debian testing source index**. When the official FFmpeg stable release is newer, its upstream-signed source tarball replaces Debian's older upstream source. Ubuntu-specific packaging and library ABI adjustments are applied during source preparation. A single daily GitHub Actions cron checks both publication channels for new stable versions. Native binary builds, dependency checks, and clean-container installation tests must pass before the GitHub Pages channel can publish.
 
 Launchpad runs a separate binary build after accepting a signed source upload. Availability and results may differ across distribution channels.
 

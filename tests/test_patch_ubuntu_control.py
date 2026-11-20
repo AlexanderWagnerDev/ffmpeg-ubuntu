@@ -31,6 +31,13 @@ class RuntimeDependsTests(unittest.TestCase):
         self.assertIn("${shlibs:Depends}", modified)
         self.assertIn("${misc:Depends}", modified)
 
+    def test_adds_missing_depends_field(self):
+        control = CONTROL.replace("Depends: ${shlibs:Depends}, ${misc:Depends}\nDescription: FFmpeg tools\n", "Description: FFmpeg tools\n")
+        modified = add_runtime_dependencies(control)
+        self.assertIn("Depends: ${shlibs:Depends}, ${misc:Depends},", modified)
+        self.assertIn("libavdevice63 (= ${binary:Version})", modified)
+        self.assertEqual(modified, add_runtime_dependencies(modified))
+
     def test_idempotent(self):
         once = add_runtime_dependencies(CONTROL)
         self.assertEqual(add_runtime_dependencies(once), once)

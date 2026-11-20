@@ -38,9 +38,9 @@ See the [installation guide](docs/INSTALLATION.md) for the public keyring, APT s
 
 | Ubuntu | AMD64 | ARM64 |
 |---|---|---|
+| **24.04 LTS (Noble)** | Build target | Build target |
 | **26.04 LTS (Resolute)** | Build target | Build target |
-| 24.04 LTS (Noble) | Not yet supported | Not yet supported |
-| 22.04 LTS (Jammy) | Not yet supported | Not yet supported |
+| **26.10 (Stonking)** | Build target | Build target |
 
 A **build target is not a guarantee that installable packages have been published**. Check the [workflow results](https://github.com/AlexanderWagnerDev/ffmpeg-ubuntu/actions) and [PPA package status](https://launchpad.net/~alexanderwagnerdev/+archive/ubuntu/ffmpeg).
 
@@ -50,7 +50,7 @@ The Debian FFmpeg source package produces the `ffmpeg` and `ffplay` tools, `ffpr
 
 - Current stable FFmpeg audio/video encoding, decoding, transcoding and streaming.
 - APT-native dependency management and cryptographically signed repository metadata.
-- Native Ubuntu 26.04 AMD64 and ARM64 binary builds and installation tests.
+- AMD64 and ARM64 binary builds and installation tests for Ubuntu 24.04, 26.04 and 26.10.
 - Public source packaging automation and transparent build results.
 
 ## Build provenance

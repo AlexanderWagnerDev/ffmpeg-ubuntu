@@ -67,7 +67,7 @@ class RuntimeDependsTests(unittest.TestCase):
                 prefix = old.rstrip("0123456789")
                 parent = base / prefix
                 parent.mkdir()
-                (parent / "version_major.h").write_text(
+                (parent / ("version.h" if prefix == "libavutil" else "version_major.h")).write_text(
                     f"#define {prefix.upper()}_VERSION_MAJOR {major}\\n"
                 )
             packages = current_runtime_packages(base)

@@ -1,0 +1,132 @@
+name: Publish FFmpeg APT via GitHub Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: Positive revision for the current Debian source package
+        required: true
+        type: string
+        default: '1'
+  schedule:
+    # Disabled by default. Set PAGES_APT_AUTO_PUBLISH=true only after first success.
+    - cron: '23 5 * * 3'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ffmpeg-ubuntu-pages-deployment
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' || vars.PAGES_APT_AUTO_PUBLISH == 'true')
+    name: Build FFmpeg for ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 300
+    steps:
+      - name: Check out code without storing credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate package revision and native architecture
+        shell: bash
+        env:
+          REVISION: ${{ inputs.revision || '1' }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          [[ "$REVISION" =~ ^[1-9][0-9]*$ ]] || exit 2
+          if [[ "$ARCH" == amd64 ]]; then
+            test "$(uname -m)" = x86_64
+          else
+            test "$(uname -m)" = aarch64
+          fi
+          docker info >/dev/null
+      - name: Configure signed Debian source index
+        run: sudo bash scripts/setup-build-env.sh
+      - name: Generate Ubuntu 26.04 FFmpeg 9 source
+        env:
+          REVISION: ${{ inputs.revision || '1' }}
+        run: bash scripts/build-source.sh resolute "$REVISION"
+      - name: Verify source and Ubuntu build dependencies
+        run: |
+          bash scripts/verify-source.sh resolute
+          bash scripts/check-build-deps.sh resolute
+      - name: Compile FFmpeg binary packages in native Ubuntu 26.04
+        run: bash scripts/build-binaries.sh resolute ${{ matrix.arch }}
+      - name: Test installation and transcoding in fresh Ubuntu 26.04
+        run: bash scripts/test-binaries.sh resolute ${{ matrix.arch }}
+      - name: Upload tested architecture packages
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ffmpeg-resolute-${{ matrix.arch }}
+          path: binaries/resolute/${{ matrix.arch }}/*.deb
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
+
+  sign:
+    needs: build
+    name: Sign AMD64 and ARM64 APT indexes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: apt-pages-signing
+    steps:
+      - name: Check out only repository signing scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download tested AMD64 packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ffmpeg-resolute-amd64
+          path: binaries/resolute/amd64
+      - name: Download tested ARM64 packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ffmpeg-resolute-arm64
+          path: binaries/resolute/arm64
+      - name: Install APT archive and signature utilities
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends dpkg-dev apt-utils gnupg
+      - name: Assemble signed repository for both architectures
+        env:
+          PAGES_APT_GPG_PRIVATE_KEY_B64: ${{ secrets.PAGES_APT_GPG_PRIVATE_KEY_B64 }}
+          PAGES_APT_GPG_FINGERPRINT: ${{ secrets.PAGES_APT_GPG_FINGERPRINT }}
+        run: bash scripts/assemble-pages.sh binaries/resolute
+      - name: Validate both repository indexes with APT
+        run: bash scripts/verify-pages-apt.sh
+      - name: Upload signed static GitHub Pages repository
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+
+  deploy:
+    needs: sign
+    name: Deploy repository on GitHub Pages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    steps:
+      - name: Deploy signed repository
+        id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

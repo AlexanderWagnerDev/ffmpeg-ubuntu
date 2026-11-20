@@ -42,7 +42,7 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'workflow_dispatch' || needs.check-upstream.outputs.update == 'true')
-    name: Prepare one consistent FFmpeg 9 source package
+    name: Prepare latest stable FFmpeg source package
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -57,7 +57,7 @@ jobs:
           [[ "$REVISION" =~ ^[1-9][0-9]*$ ]] || exit 2
       - name: Configure signed Debian source index
         run: sudo bash scripts/setup-build-env.sh
-      - name: Assemble and validate Ubuntu FFmpeg 9 source
+      - name: Assemble and validate latest stable FFmpeg source
         env:
           REVISION: ${{ inputs.revision || '1' }}
         run: |

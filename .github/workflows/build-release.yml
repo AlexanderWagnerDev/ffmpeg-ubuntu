@@ -19,7 +19,6 @@ jobs:
       matrix:
         series: [noble, resolute, stonking]
     runs-on: ubuntu-latest
-    timeout-minutes: 75
     steps:
       - name: Checkout verified packaging automation
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

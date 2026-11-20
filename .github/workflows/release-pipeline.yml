@@ -68,3 +68,34 @@ jobs:
     secrets:
       PPA_GPG_PRIVATE_KEY_B64: ${{ secrets.PPA_GPG_PRIVATE_KEY_B64 }}
       PPA_GPG_FINGERPRINT: ${{ secrets.PPA_GPG_FINGERPRINT }}
+
+  check-health:
+    needs: [check, build, pages, ppa]
+    if: always()
+    name: Report release-check failures
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Fail if either publication channel could not be checked
+        shell: bash
+        env:
+          CHECK_RESULT: ${{ needs.check.result }}
+          PAGES_CHECK: ${{ needs.check.outputs.pages_check }}
+          PPA_CHECK: ${{ needs.check.outputs.ppa_check }}
+        run: |
+          set -euo pipefail
+          failed=0
+          if [[ "$CHECK_RESULT" != 'success' ]]; then
+            echo "::error::Release decision job failed: $CHECK_RESULT"
+            failed=1
+          fi
+          if [[ "$PAGES_CHECK" != 'success' ]]; then
+            echo "::error::GitHub Pages version check failed; Pages publishing was blocked"
+            failed=1
+          fi
+          if [[ "$PPA_CHECK" != 'success' ]]; then
+            echo "::error::Launchpad PPA version check failed; PPA publishing was blocked"
+            failed=1
+          fi
+          exit "$failed"

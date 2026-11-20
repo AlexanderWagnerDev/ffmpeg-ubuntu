@@ -14,3 +14,7 @@ dist/
 *.upload
 *.asc
 !.github/**
+
+# GitHub Pages APT deployment builds
+binaries/
+site/

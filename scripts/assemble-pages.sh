@@ -53,9 +53,21 @@ for suite in "${SERIES[@]}"; do
       fi
       destination="$SITE/pool/$suite/main/f/ffmpeg/$(basename "$deb")"
       if [[ -e "$destination" ]]; then
-        cmp -s "$deb" "$destination" || {
-          echo "Conflicting architecture-independent package $destination" >&2; exit 1;
-        }
+        if [[ "$package_arch" == "all" ]]; then
+          # Architecture-independent packages are rebuilt for both native
+          # architectures and can differ in build metadata. Publish a single
+          # copy, but never mix package versions.
+          existing_version="$(dpkg-deb -f "$destination" Version)"
+          new_version="$(dpkg-deb -f "$deb" Version)"
+          [[ "$existing_version" == "$new_version" ]] || {
+            echo "Conflicting architecture-independent versions for $destination: $existing_version vs $new_version" >&2
+            exit 1
+          }
+        else
+          cmp -s "$deb" "$destination" || {
+            echo "Conflicting architecture-dependent package $destination" >&2; exit 1;
+          }
+        fi
       else
         cp -- "$deb" "$destination"
       fi

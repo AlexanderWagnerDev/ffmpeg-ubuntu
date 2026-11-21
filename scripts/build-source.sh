@@ -60,15 +60,9 @@ if dpkg --compare-versions "$UPSTREAM_RELEASE" gt "$DEBIAN_UPSTREAM"; then
   DEBIAN_VERSION="$DEBIAN_EPOCH:$UPSTREAM_RELEASE-0"
 fi
 NEW_VERSION="$(python3 "$ROOT/scripts/package_version.py" "$DEBIAN_VERSION" "$SERIES" "$REVISION")"
-# Ensure Debian's debhelper packaging can build on all supported suites.
-if grep -Fq 'debhelper-compat (= 14)' "$SOURCE_DIR/debian/control"; then
-  sed -i 's/debhelper-compat (= 14)/debhelper-compat (= 13)/g' "$SOURCE_DIR/debian/control"
-  echo "Using Ubuntu-compatible debhelper level 13"
-elif ! grep -Fq 'debhelper-compat (= 13)' "$SOURCE_DIR/debian/control"; then
-  echo "Debian debhelper requirement changed; review the packaging" >&2
-  exit 1
-fi
-python3 "$ROOT/scripts/patch_ubuntu_control.py" "$SOURCE_DIR/debian/control"
+# Select the compatibility level from the TARGET Ubuntu suite (not the CI
+# runner): Noble/Resolute provide debhelper 13, Stonking provides debhelper 14.
+python3 "$ROOT/scripts/patch_ubuntu_control.py" "$SOURCE_DIR/debian/control" "$SERIES"
 # Ubuntu 24.04 ships libplacebo 6; FFmpeg 9.1+ needs libplacebo >= 7.351.
 # This integration is optional: disable only that feature on Noble.
 if [[ "$SERIES" == noble ]]; then
@@ -97,9 +91,16 @@ python3 "$ROOT/scripts/ffmpeg_changelog.py" \
   --debian "$SOURCE_DIR/debian/changelog"
 # Verify the new Debian stanza is well-formed before creating a source package.
 dpkg-parsechangelog --file "$SOURCE_DIR/debian/changelog" >/dev/null
-# -d skips build-dependency checks for SOURCE generation only.
-# Binary builds and runtime dependency tests run separately (Pages or Launchpad).
-dpkg-buildpackage -S -sa -us -uc -d
+# The runner (Ubuntu 26.04) has debhelper 13, but Stonking needs compat 14.
+# Its source tree is freshly extracted and prepared, so skip the pre-clean
+# (which would invoke the runner's older debhelper). The native binary build
+# still performs cleaning with the correct debhelper in ubuntu:26.10.
+# -d skips dependency checks for source generation only.
+source_build_args=(-S -sa -us -uc -d)
+if [[ "$SERIES" == stonking ]]; then
+  source_build_args+=(-nc)
+fi
+dpkg-buildpackage "${source_build_args[@]}"
 
 # Only stage files from the newly generated Ubuntu package. apt-get source
 # also leaves the ORIGINAL Debian .dsc in WORK; including it would make the

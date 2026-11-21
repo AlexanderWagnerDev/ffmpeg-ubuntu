@@ -29,7 +29,7 @@ class SupportedUbuntuTests(unittest.TestCase):
         for suite in SERIES:
             for arch in ("amd64", "arm64"):
                 with self.subTest(workflow="build-release.yml", suite=suite, arch=arch):
-                    self.assertIn(f"- series: {suite}\\n            arch: {arch}", release)
+                    self.assertIn(f"- series: {suite}\n            arch: {arch}", release)
 
         binary = (ROOT / ".github/workflows/binary-ci.yml").read_text()
         # The dynamic matrix expands to all six combinations on main/manual

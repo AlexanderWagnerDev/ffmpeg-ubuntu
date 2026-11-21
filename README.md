@@ -109,6 +109,18 @@ For Launchpad, `Deleted` and `Obsolete` source records do **not** count as curre
 
 Every Ubuntu source package now includes the **official FFmpeg release notes** for its exact upstream version in `debian/changelog`, in addition to the Ubuntu packaging/rebuild entry. The notes are read directly from the source tree's upstream `Changelog` (the official signed FFmpeg tarball when updated, or the signed Debian source when already current), not a separately scraped web summary. The PPA package's **Changelog** shows the release-specific features and fixes for each Ubuntu version, rather than just a generic rebuild line. If the exact release section cannot be found, the build fails rather than publishing misleading notes.
 
+### Debhelper compatibility
+
+The source packaging selects the compatibility level from the **target Ubuntu release**, rather than the CI runner:
+
+| Ubuntu release | Debhelper compatibility |
+|---|---|
+| 24.04 Noble | 13 |
+| 26.04 Resolute | 13 |
+| 26.10 Stonking | 14 |
+
+The Stonking source-only package creation skips pre-clean on the Ubuntu 26.04 CI runner, where debhelper 14 is unavailable. Native Stonking binary builds run the packaging rules in an Ubuntu 26.10 container with debhelper 14. Unexpected changes in Debian's upstream compatibility requirement fail packaging for review.
+
 ## Build provenance
 
 Debian packaging comes from the **signed Debian testing source index**. When the official FFmpeg stable release is newer, its upstream-signed source tarball replaces Debian's older upstream source. Ubuntu-specific packaging and library ABI adjustments are applied during source preparation. A single daily GitHub Actions cron checks both publication channels for new stable versions. Native binary builds, dependency checks, and clean-container installation tests must pass before the GitHub Pages channel can publish.

@@ -40,6 +40,54 @@ def select_debhelper_compat(control: str, series: str) -> str:
     return control[:match.start()] + f"debhelper-compat (= {level})" + control[match.end():]
 
 
+
+def ensure_generated_dependencies(control: str) -> str:
+    """Keep dpkg-shlibdeps dependencies for every native binary package.
+
+    Debian's packaging can omit Depends fields in library stanzas; in that case
+    dh_shlibdeps calculates the correct dependencies but dpkg-gencontrol discards
+    them. Include the standard substvars without hardcoding external libraries.
+    """
+    paragraphs = re.split(r"(\n\n+)", control)
+    for index in range(0, len(paragraphs), 2):
+        paragraph = paragraphs[index]
+        if not re.search(r"(?m)^Package: [^\n]+$", paragraph):
+            continue
+        architecture = re.search(r"(?m)^Architecture:\s*([^\n]+)", paragraph)
+        if architecture is None or architecture.group(1).strip() == "all":
+            continue
+
+        lines = paragraph.splitlines(keepends=True)
+        dep_positions = [i for i, line in enumerate(lines)
+                         if line.startswith("Depends:")]
+        if len(dep_positions) > 1:
+            raise ValueError("Multiple Depends fields in binary package")
+        if not dep_positions:
+            package_pos = next(i for i, line in enumerate(lines)
+                               if line.startswith("Package:"))
+            lines.insert(package_pos + 1,
+                         "Depends: ${shlibs:Depends}, ${misc:Depends}\n")
+        else:
+            start = dep_positions[0]
+            end = start + 1
+            while end < len(lines) and lines[end][:1] in (" ", "\t"):
+                end += 1
+            existing = "".join(lines[start:end])
+            missing = [var for var in ("${shlibs:Depends}", "${misc:Depends}")
+                       if var not in existing]
+            if missing:
+                first_value = lines[start][len("Depends:"):].strip()
+                if first_value:
+                    lines[start] = f"Depends: {', '.join(missing)},\n"
+                    lines.insert(start + 1, f" {first_value}\n")
+                elif end > start + 1:
+                    lines[start] = f"Depends: {', '.join(missing)},\n"
+                else:
+                    lines[start] = f"Depends: {', '.join(missing)}\n"
+        paragraphs[index] = "".join(lines)
+    return "".join(paragraphs)
+
+
 def add_runtime_dependencies(control: str, packages: tuple[str, ...] = FFMPEG_RUNTIME) -> str:
     paragraphs = re.split(r"(\n\n+)", control)
     match_count = 0
@@ -213,6 +261,7 @@ def main() -> None:
     sync_abi_metadata(args.control.parent, packages)
     content = args.control.read_text(encoding="utf-8")
     updated = select_debhelper_compat(content, args.series)
+    updated = ensure_generated_dependencies(updated)
     updated = add_runtime_dependencies(updated, packages)
     updated = add_device_library_dependency(updated, packages[1])
     args.control.write_text(updated, encoding="utf-8")

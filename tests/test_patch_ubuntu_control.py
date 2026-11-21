@@ -7,6 +7,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from patch_ubuntu_control import (add_runtime_dependencies, add_device_library_dependency,
+                                  ensure_generated_dependencies,
                                   FFMPEG_RUNTIME, current_runtime_packages,
                                   sync_abi_metadata, select_debhelper_compat)
 
@@ -65,6 +66,63 @@ class DebhelperCompatibilityTests(unittest.TestCase):
                 self.CONTROL.replace("libfoo-dev", "debhelper-compat (= 13)"),
                 "stonking",
             )
+
+
+
+class GeneratedShlibsTests(unittest.TestCase):
+    def test_adds_substvars_to_missing_native_package_dependencies(self):
+        control = (
+            "Source: ffmpeg\n\n"
+            "Package: libavfilter12\nArchitecture: any\n"
+            "Description: Filter library\n\n"
+            "Package: ffmpeg-doc\nArchitecture: all\n"
+            "Description: Architecture-independent documentation\n"
+        )
+        updated = ensure_generated_dependencies(control)
+        self.assertIn(
+            "Package: libavfilter12\n"
+            "Depends: ${shlibs:Depends}, ${misc:Depends}\n"
+            "Architecture: any\n",
+            updated,
+        )
+        self.assertIn(
+            "Package: ffmpeg-doc\nArchitecture: all\nDescription:",
+            updated,
+        )
+        self.assertEqual(updated, ensure_generated_dependencies(updated))
+
+    def test_preserves_existing_multiline_dependencies(self):
+        control = (
+            "Package: libavcodec63\nArchitecture: any\n"
+            "Depends: libc6 (>= 2.39),\n libmfx1\nDescription: Library\n"
+        )
+        updated = ensure_generated_dependencies(control)
+        self.assertIn(
+            "Depends: ${shlibs:Depends}, ${misc:Depends},\n"
+            " libc6 (>= 2.39),\n libmfx1\n",
+            updated,
+        )
+        self.assertEqual(updated, ensure_generated_dependencies(updated))
+
+    def test_adds_only_missing_substvars(self):
+        control = (
+            "Package: ffplay\nArchitecture: any\n"
+            "Depends: ${misc:Depends}\nDescription: Player\n"
+        )
+        updated = ensure_generated_dependencies(control)
+        self.assertIn(
+            "Depends: ${shlibs:Depends},\n ${misc:Depends}\n",
+            updated,
+        )
+        self.assertEqual(updated, ensure_generated_dependencies(updated))
+
+    def test_rejects_duplicate_depends_fields(self):
+        control = (
+            "Package: libavfilter12\nArchitecture: any\n"
+            "Depends: libc6\nDepends: libfoo\n"
+        )
+        with self.assertRaises(ValueError):
+            ensure_generated_dependencies(control)
 
 
 class RuntimeDependsTests(unittest.TestCase):

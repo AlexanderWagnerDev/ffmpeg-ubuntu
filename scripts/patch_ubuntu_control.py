@@ -21,6 +21,25 @@ FFMPEG_RUNTIME = (
 )
 
 
+DEBHELPER_COMPAT_BY_SERIES = {
+    "noble": 13,
+    "resolute": 13,
+    "stonking": 14,
+}
+
+
+def select_debhelper_compat(control: str, series: str) -> str:
+    """Use the compatibility level available in the target Ubuntu release."""
+    if series not in DEBHELPER_COMPAT_BY_SERIES:
+        raise ValueError(f"Unsupported Ubuntu series: {series}")
+    matches = list(re.finditer(r"\bdebhelper-compat\s*\(=\s*(\d+)\s*\)", control))
+    if len(matches) != 1 or matches[0].group(1) not in ("13", "14"):
+        raise ValueError("Unexpected Debian debhelper requirement; review the packaging")
+    match = matches[0]
+    level = DEBHELPER_COMPAT_BY_SERIES[series]
+    return control[:match.start()] + f"debhelper-compat (= {level})" + control[match.end():]
+
+
 def add_runtime_dependencies(control: str, packages: tuple[str, ...] = FFMPEG_RUNTIME) -> str:
     paragraphs = re.split(r"(\n\n+)", control)
     match_count = 0
@@ -188,14 +207,19 @@ def sync_abi_metadata(debian: Path, packages: tuple[str, ...]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("control", type=Path)
+    parser.add_argument("series", choices=tuple(DEBHELPER_COMPAT_BY_SERIES))
     args = parser.parse_args()
     packages = current_runtime_packages(args.control.parent.parent)
     sync_abi_metadata(args.control.parent, packages)
     content = args.control.read_text(encoding="utf-8")
-    updated = add_runtime_dependencies(content, packages)
+    updated = select_debhelper_compat(content, args.series)
+    updated = add_runtime_dependencies(updated, packages)
     updated = add_device_library_dependency(updated, packages[1])
     args.control.write_text(updated, encoding="utf-8")
-    print("Verified FFmpeg runtime library and ABI dependencies")
+    print(
+        f"Using debhelper compat {DEBHELPER_COMPAT_BY_SERIES[args.series]} "
+        f"for Ubuntu {args.series}; verified FFmpeg runtime and ABI dependencies"
+    )
 
 
 if __name__ == "__main__":

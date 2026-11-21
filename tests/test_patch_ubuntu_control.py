@@ -92,6 +92,25 @@ class RuntimeDependsTests(unittest.TestCase):
         )
         self.assertNotIn("Package: ffmpeg\\nArchitecture: any\\nDepends: libraw1394", updated)
 
+    def test_libavdevice_without_depends_field(self):
+        # Current Debian FFmpeg source can omit Depends in the device stanza.
+        control = CONTROL.replace(
+            "Package: libavdevice63\nArchitecture: any\n"
+            "Depends: ${shlibs:Depends}, ${misc:Depends}\n",
+            "Package: libavdevice63\nArchitecture: any\n",
+        )
+        updated = add_device_library_dependency(control, "libavdevice63")
+        self.assertIn(
+            "Package: libavdevice63\n"
+            "Depends: ${shlibs:Depends}, ${misc:Depends},\n"
+            " libraw1394-11\n"
+            "Architecture: any\n",
+            updated,
+        )
+        self.assertEqual(
+            updated, add_device_library_dependency(updated, "libavdevice63")
+        )
+
     def test_missing_device_stanza_refuses_broken_dependencies(self):
         with self.assertRaises(ValueError):
             add_device_library_dependency(CONTROL, "libavdevice64")

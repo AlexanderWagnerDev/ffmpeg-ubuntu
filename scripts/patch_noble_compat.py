@@ -48,9 +48,10 @@ def skip_broken_dwz(rules: str) -> str:
 
 def patch(debian: Path) -> None:
     rules_file = debian / "rules"
-    symbols_file = debian / "libavutil61.symbols"
+    # Debian generates libavutil61.symbols from this template during the binary build.
+    symbols_file = debian / "libavutil61.symbols.in"
     if not rules_file.is_file() or not symbols_file.is_file():
-        raise FileNotFoundError("Expected Debian rules and libavutil61.symbols")
+        raise FileNotFoundError("Expected Debian rules and libavutil61.symbols.in")
     rules = skip_broken_dwz(rules_file.read_text(encoding="utf-8"))
     symbols = mark_vulkan_symbols_optional(symbols_file.read_text(encoding="utf-8"))
     rules_file.write_text(rules, encoding="utf-8")

@@ -7,6 +7,8 @@ on:
       - 'scripts/prepare-upstream.sh'
       - 'scripts/latest_release.py'
       - 'scripts/patch_ubuntu_control.py'
+      - 'scripts/patch_noble_compat.py'
+      - 'tests/test_noble_compat.py'
       - 'scripts/setup-build-env.sh'
       - 'scripts/package_version.py'
       - 'scripts/verify-source.sh'

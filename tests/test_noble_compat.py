@@ -52,18 +52,29 @@ class NobleCompatibilityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             debian = Path(root)
             rules = debian / "rules"
-            symbols = debian / "libavutil61.symbols"
+            symbols = debian / "libavutil61.symbols.in"
             rules.write_text("%:\n\tdh $@\n")
             symbols.write_text(SYMBOLS)
             patch(debian)
             self.assertIn("override_dh_dwz", rules.read_text())
             self.assertIn("(optional)av_vk_get", symbols.read_text())
 
+    def test_requires_debian_symbols_template(self):
+        with tempfile.TemporaryDirectory() as root:
+            debian = Path(root)
+            rules = debian / "rules"
+            rules.write_text("%:\n\tdh $@\n")
+            # The generated .symbols file cannot replace Debian's source template.
+            (debian / "libavutil61.symbols").write_text(SYMBOLS)
+            with self.assertRaisesRegex(FileNotFoundError, "libavutil61.symbols.in"):
+                patch(debian)
+            self.assertNotIn("override_dh_dwz", rules.read_text())
+
     def test_validation_error_does_not_write_rules(self):
         with tempfile.TemporaryDirectory() as root:
             debian = Path(root)
             rules = debian / "rules"
-            symbols = debian / "libavutil61.symbols"
+            symbols = debian / "libavutil61.symbols.in"
             original = "%:\n\tdh $@\n"
             rules.write_text(original)
             symbols.write_text("invalid symbols\n")

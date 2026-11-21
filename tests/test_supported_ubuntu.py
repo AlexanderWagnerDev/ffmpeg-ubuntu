@@ -25,12 +25,37 @@ class SupportedUbuntuTests(unittest.TestCase):
                     self.assertIn(suite, text)
 
     def test_native_architecture_matrix(self):
-        for workflow in ("binary-ci.yml", "build-release.yml"):
-            text = (ROOT / ".github/workflows" / workflow).read_text()
-            for suite in SERIES:
-                for arch in ("amd64", "arm64"):
-                    with self.subTest(workflow=workflow, suite=suite, arch=arch):
-                        self.assertIn(f"- series: {suite}\n            arch: {arch}", text)
+        release = (ROOT / ".github/workflows/build-release.yml").read_text()
+        for suite in SERIES:
+            for arch in ("amd64", "arm64"):
+                with self.subTest(workflow="build-release.yml", suite=suite, arch=arch):
+                    self.assertIn(f"- series: {suite}\n            arch: {arch}", release)
+
+        binary = (ROOT / ".github/workflows/binary-ci.yml").read_text()
+        # The dynamic matrix expands to all six combinations on main/manual
+        # and one Stonking/amd64 combination for pull requests.
+        for entry in ('["noble","resolute","stonking"]', '["amd64","arm64"]',
+                      '["stonking"]', '["amd64"]'):
+            with self.subTest(matrix=entry):
+                self.assertIn(entry, binary)
+        self.assertIn("github.event_name == 'pull_request'", binary)
+        self.assertIn("  pull_request:\n    paths:", binary)
+        self.assertIn(
+            "matrix.arch == 'arm64' && 'ubuntu-26.04-arm' || 'ubuntu-latest'",
+            binary,
+        )
+
+    def test_stonking_pull_request_build_covers_source_and_binary(self):
+        text = (ROOT / ".github/workflows/binary-ci.yml").read_text()
+        required = (
+            "Build Ubuntu source",
+            "Verify package source",
+            "Verify Ubuntu build dependencies",
+            "Compile native FFmpeg packages",
+            "Install and smoke-test FFmpeg",
+        )
+        positions = [text.index(step) for step in required]
+        self.assertEqual(positions, sorted(positions))
 
     def test_only_pipeline_has_a_release_schedule(self):
         workflows = ROOT / ".github/workflows"

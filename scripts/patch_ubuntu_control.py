@@ -21,6 +21,25 @@ FFMPEG_RUNTIME = (
 )
 
 
+DEBHELPER_COMPAT_BY_SERIES = {
+    "noble": 13,
+    "resolute": 13,
+    "stonking": 14,
+}
+
+
+def select_debhelper_compat(control: str, series: str) -> str:
+    """Use the compatibility level available in the target Ubuntu release."""
+    if series not in DEBHELPER_COMPAT_BY_SERIES:
+        raise ValueError(f"Unsupported Ubuntu series: {series}")
+    matches = list(re.finditer(r"\bdebhelper-compat\s*\(=\s*(\d+)\s*\)", control))
+    if len(matches) != 1 or matches[0].group(1) not in ("13", "14"):
+        raise ValueError("Unexpected Debian debhelper requirement; review the packaging")
+    match = matches[0]
+    level = DEBHELPER_COMPAT_BY_SERIES[series]
+    return control[:match.start()] + f"debhelper-compat (= {level})" + control[match.end():]
+
+
 def add_runtime_dependencies(control: str, packages: tuple[str, ...] = FFMPEG_RUNTIME) -> str:
     paragraphs = re.split(r"(\n\n+)", control)
     match_count = 0
@@ -89,8 +108,23 @@ def add_device_library_dependency(
         matches += 1
         lines = paragraph.splitlines(keepends=True)
         dep_positions = [i for i, line in enumerate(lines) if line.startswith("Depends:")]
-        if len(dep_positions) != 1:
-            raise ValueError(f"Expected one Depends field in {device_package}")
+        if len(dep_positions) > 1:
+            raise ValueError(f"Multiple Depends fields in {device_package}")
+        if not dep_positions:
+            # Debian packaging may omit Depends and rely on generated
+            # shlibs dependencies. Preserve those while adding libraw1394.
+            package_pos = next(
+                (i for i, line in enumerate(lines)
+                 if line.rstrip("\n") == f"Package: {device_package}"),
+                None,
+            )
+            if package_pos is None:
+                raise ValueError(f"Missing {device_package} package field")
+            insert_at = package_pos + 1
+            while insert_at < len(lines) and lines[insert_at][:1] in (" ", "\t"):
+                insert_at += 1
+            lines.insert(insert_at, "Depends: ${shlibs:Depends}, ${misc:Depends}\n")
+            dep_positions = [insert_at]
         start = dep_positions[0]
         end = start + 1
         while end < len(lines) and lines[end][:1] in (" ", "\t"):
@@ -173,14 +207,19 @@ def sync_abi_metadata(debian: Path, packages: tuple[str, ...]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("control", type=Path)
+    parser.add_argument("series", choices=tuple(DEBHELPER_COMPAT_BY_SERIES))
     args = parser.parse_args()
     packages = current_runtime_packages(args.control.parent.parent)
     sync_abi_metadata(args.control.parent, packages)
     content = args.control.read_text(encoding="utf-8")
-    updated = add_runtime_dependencies(content, packages)
+    updated = select_debhelper_compat(content, args.series)
+    updated = add_runtime_dependencies(updated, packages)
     updated = add_device_library_dependency(updated, packages[1])
     args.control.write_text(updated, encoding="utf-8")
-    print("Verified FFmpeg runtime library and ABI dependencies")
+    print(
+        f"Using debhelper compat {DEBHELPER_COMPAT_BY_SERIES[args.series]} "
+        f"for Ubuntu {args.series}; verified FFmpeg runtime and ABI dependencies"
+    )
 
 
 if __name__ == "__main__":

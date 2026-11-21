@@ -8,7 +8,7 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from patch_ubuntu_control import (add_runtime_dependencies, add_device_library_dependency,
                                   FFMPEG_RUNTIME, current_runtime_packages,
-                                  sync_abi_metadata)
+                                  sync_abi_metadata, select_debhelper_compat)
 
 
 CONTROL = """Source: ffmpeg
@@ -24,6 +24,47 @@ Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Device library
 """
+
+
+class DebhelperCompatibilityTests(unittest.TestCase):
+    CONTROL = (
+        "Source: ffmpeg\n"
+        "Build-Depends: debhelper-compat (= 14), libfoo-dev\n"
+        "\nPackage: ffmpeg\nArchitecture: any\n"
+    )
+
+    def test_suite_specific_compat(self):
+        for suite, level in (("noble", 13), ("resolute", 13), ("stonking", 14)):
+            with self.subTest(series=suite):
+                result = select_debhelper_compat(self.CONTROL, suite)
+                self.assertIn(f"debhelper-compat (= {level})", result)
+                self.assertIn("libfoo-dev", result)
+                self.assertEqual(result, select_debhelper_compat(result, suite))
+
+    def test_upgrades_13_to_14_on_stonking(self):
+        old = self.CONTROL.replace("debhelper-compat (= 14)", "debhelper-compat (= 13)")
+        self.assertIn(
+            "debhelper-compat (= 14)", select_debhelper_compat(old, "stonking")
+        )
+
+    def test_unknown_suite_fails(self):
+        with self.assertRaises(ValueError):
+            select_debhelper_compat(self.CONTROL, "jammy")
+
+    def test_unexpected_upstream_level_fails(self):
+        for value in ("debhelper-compat (= 15)", "debhelper-compat (= 12)", "other"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                select_debhelper_compat(
+                    self.CONTROL.replace("debhelper-compat (= 14)", value),
+                    "noble",
+                )
+
+    def test_multiple_debhelper_requirements_fail(self):
+        with self.assertRaises(ValueError):
+            select_debhelper_compat(
+                self.CONTROL.replace("libfoo-dev", "debhelper-compat (= 13)"),
+                "stonking",
+            )
 
 
 class RuntimeDependsTests(unittest.TestCase):
@@ -91,6 +132,25 @@ class RuntimeDependsTests(unittest.TestCase):
             updated, add_device_library_dependency(updated, "libavdevice63")
         )
         self.assertNotIn("Package: ffmpeg\\nArchitecture: any\\nDepends: libraw1394", updated)
+
+    def test_libavdevice_without_depends_field(self):
+        # Current Debian FFmpeg source can omit Depends in the device stanza.
+        control = CONTROL.replace(
+            "Package: libavdevice63\nArchitecture: any\n"
+            "Depends: ${shlibs:Depends}, ${misc:Depends}\n",
+            "Package: libavdevice63\nArchitecture: any\n",
+        )
+        updated = add_device_library_dependency(control, "libavdevice63")
+        self.assertIn(
+            "Package: libavdevice63\n"
+            "Depends: ${shlibs:Depends}, ${misc:Depends},\n"
+            " libraw1394-11\n"
+            "Architecture: any\n",
+            updated,
+        )
+        self.assertEqual(
+            updated, add_device_library_dependency(updated, "libavdevice63")
+        )
 
     def test_missing_device_stanza_refuses_broken_dependencies(self):
         with self.assertRaises(ValueError):

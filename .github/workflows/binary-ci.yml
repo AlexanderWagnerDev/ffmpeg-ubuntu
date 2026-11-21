@@ -13,6 +13,18 @@ on:
       - 'scripts/setup-build-env.sh'
       - 'scripts/package_version.py'
       - '.github/workflows/binary-ci.yml'
+  pull_request:
+    paths:
+      - 'scripts/build-binaries.sh'
+      - 'scripts/test-binaries.sh'
+      - 'scripts/build-source.sh'
+      - 'scripts/prepare-upstream.sh'
+      - 'scripts/latest_release.py'
+      - 'scripts/patch_ubuntu_control.py'
+      - 'scripts/check-build-deps.sh'
+      - 'scripts/setup-build-env.sh'
+      - 'scripts/package_version.py'
+      - '.github/workflows/binary-ci.yml'
   workflow_dispatch:
 
 permissions:
@@ -23,27 +35,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - series: noble
-            arch: amd64
-            runner: ubuntu-latest
-          - series: noble
-            arch: arm64
-            runner: ubuntu-26.04-arm
-          - series: resolute
-            arch: amd64
-            runner: ubuntu-latest
-          - series: resolute
-            arch: arm64
-            runner: ubuntu-26.04-arm
-          - series: stonking
-            arch: amd64
-            runner: ubuntu-latest
-          - series: stonking
-            arch: arm64
-            runner: ubuntu-26.04-arm
+        # PRs exercise the changed debhelper-14 path on one native target.
+        # Main and manual builds keep the full Ubuntu/architecture matrix.
+        series: ${{ fromJSON(github.event_name == 'pull_request' && '["stonking"]' || '["noble","resolute","stonking"]') }}
+        arch: ${{ fromJSON(github.event_name == 'pull_request' && '["amd64"]' || '["amd64","arm64"]') }}
     name: FFmpeg ${{ matrix.series }}/${{ matrix.arch }}
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-26.04-arm' || 'ubuntu-latest' }}
     timeout-minutes: 300
     steps:
       - name: Checkout source automation

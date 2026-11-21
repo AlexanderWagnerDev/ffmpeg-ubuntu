@@ -89,8 +89,23 @@ def add_device_library_dependency(
         matches += 1
         lines = paragraph.splitlines(keepends=True)
         dep_positions = [i for i, line in enumerate(lines) if line.startswith("Depends:")]
-        if len(dep_positions) != 1:
-            raise ValueError(f"Expected one Depends field in {device_package}")
+        if len(dep_positions) > 1:
+            raise ValueError(f"Multiple Depends fields in {device_package}")
+        if not dep_positions:
+            # Debian packaging may omit Depends and rely on generated
+            # shlibs dependencies. Preserve those while adding libraw1394.
+            package_pos = next(
+                (i for i, line in enumerate(lines)
+                 if line.rstrip("\n") == f"Package: {device_package}"),
+                None,
+            )
+            if package_pos is None:
+                raise ValueError(f"Missing {device_package} package field")
+            insert_at = package_pos + 1
+            while insert_at < len(lines) and lines[insert_at][:1] in (" ", "\t"):
+                insert_at += 1
+            lines.insert(insert_at, "Depends: ${shlibs:Depends}, ${misc:Depends}\n")
+            dep_positions = [insert_at]
         start = dep_positions[0]
         end = start + 1
         while end < len(lines) and lines[end][:1] in (" ", "\t"):

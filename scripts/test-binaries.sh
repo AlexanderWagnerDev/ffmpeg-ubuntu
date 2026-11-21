@@ -35,6 +35,7 @@ docker run --rm \
     apt-get install -y --no-install-recommends ffmpeg ffplay
     ffmpeg -hide_banner -version | grep -Eq "^ffmpeg version (n)?[0-9]+\."
     ffprobe -hide_banner -version | grep -Eq "^ffprobe version (n)?[0-9]+\."
+    ffplay -hide_banner -version | grep -Eq "^ffprobe version (n)?[0-9]+\."
     ffmpeg -hide_banner -loglevel error -f lavfi -i "sine=frequency=440:duration=0.1" \
       -ac 1 -ar 8000 -f wav -y /tmp/smoke.wav
     test -s /tmp/smoke.wav
@@ -43,7 +44,7 @@ docker run --rm \
     checked=0
     for deb in /packages/*.deb; do
       package="$(dpkg-deb -f "$deb" Package)"
-      if [[ "$(dpkg-query -W -f="\\${db:Status-Status}" "$package" 2>/dev/null || true)" != "installed" ]]; then
+      if [[ "$(dpkg-query -W -f="\${db:Status-Status}" "$package" 2>/dev/null || true)" != "installed" ]]; then
         continue
       fi
       while IFS= read -r path; do
